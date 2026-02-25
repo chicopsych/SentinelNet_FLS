@@ -9,12 +9,13 @@ Fluxo esperado (a implementar nas Tasks seguintes):
     3. Coletar o snapshot de configuração atual via driver.
     4. Carregar a baseline JSON do inventário/.
     5. Comparar snapshot × baseline com o Diff Engine (Task 05).
-    6. Persistir relatório de desvios (Task 06).
+    6. Persistir relatório de desvios (Task 06). ✅
 """
 
 import json
 
-from core import DiffEngine
+from core import DiffEngine, ReportManager
+from core.audit_report import AuditReport
 from core.schemas import DeviceConfig, FirewallRule, Interface, InterfaceType, Route
 from internalloggin.logger import setup_logger
 
@@ -128,15 +129,34 @@ def demo_diff_engine() -> None:
     else:
         logger.info("AUDITORIA CONCLUÍDA: Equipamento em conformidade.")
 
+    # ── Persiste relatório (Task 06) ──────────────────────────────────────
+    audit = AuditReport.from_diff_report(
+        report=report,
+        customer_id="cliente_a",
+        device_id="borda-01",
+        hostname=current.hostname,
+        baseline_collected_at=baseline.collected_at,
+        current_collected_at=current.collected_at,
+    )
+
+    manager = ReportManager()
+    paths = manager.persist(audit)
+
+    logger.info("Relatórios gerados:")
+    for fmt, path in paths.items():
+        logger.info("  [%s] %s", fmt.upper(), path)
+
+    # ── Estatísticas do histórico ─────────────────────────────────────────
+    stats = manager.get_stats()
+    logger.info("Estatísticas globais: %s", stats)
+
 
 def main() -> None:
     logger.info("SentinelNet_FLS iniciado.")
 
-    # Demonstração do Diff Engine — remover/substituir quando o fluxo
-    # completo (inventário → driver → diff → relatório) estiver pronto.
+    # Demonstração do Diff Engine + Relatório — remover/substituir quando
+    # o fluxo completo (inventário → driver → diff → relatório) estiver pronto.
     demo_diff_engine()
-
-    # TODO (Task 06): Integrar geração de relatório de desvios.
 
 
 if __name__ == "__main__":

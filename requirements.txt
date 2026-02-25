@@ -15,3 +15,21 @@ netmiko>=4.0
 # proprietárias em objetos Python/JSON usando templates declarativos.
 # Alternativa ao TextFSM com sintaxe mais próxima do Jinja2.
 ttp>=0.9
+
+# ─── Criptografia de Credenciais (Task 07) ───────────────────────────────────
+# Fernet: criptografia simétrica (AES-128-CBC + HMAC-SHA256) para armazenar
+# senhas de dispositivos de rede em repouso. A Master Key fica em variável
+# de ambiente (SENTINEL_MASTER_KEY), nunca em arquivo.
+cryptography>=41.0
+
+# ─── Geração de Relatórios HTML (Task 06) ────────────────────────────────────
+# Jinja2: motor de templates para renderizar relatórios de auditoria em HTML.
+# Usado pelo ReportManager para gerar relatórios visuais entregáveis ao
+# cliente. Possui fallback para template string se não estiver instalado.
+jinja2>=3.1
+
+# ─── Geração de Relatórios HTML (Task 06) ────────────────────────────────────
+# Jinja2: motor de templates para renderizar relatórios de auditoria em HTML.
+# Usado pelo ReportManager para gerar relatórios visuais entregáveis ao
+# cliente. Possui fallback para template string se não estiver instalado.
+jinja2>=3.1

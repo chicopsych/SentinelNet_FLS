@@ -51,6 +51,11 @@ logs/*
 *.p12
 *.pfx
 
+# Cofre de credenciais criptografado (Task 07)
+# O arquivo .enc é seguro (criptografado), mas por boas práticas
+# não versionamos dados de credenciais — mesmo criptografados.
+inventory/vault.enc
+
 # IDE / editor
 .vscode/
 .idea/

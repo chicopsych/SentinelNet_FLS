@@ -98,10 +98,56 @@ class MikroTikDriver(NetworkDeviceDriver):
     # Métodos abstratos obrigatórios
     # ──────────────────────────────────────────────────────────────────────
 
+    @classmethod
+    def from_vault(
+        cls,
+        customer_id: str,
+        device_id: str,
+        **kwargs: object,
+    ) -> "MikroTikDriver":
+        """
+        Factory method: instancia o driver com credenciais do cofre criptografado.
+
+        Uso::
+
+            driver = MikroTikDriver.from_vault("cliente_a", "borda-01")
+            with driver:
+                snapshot = driver.get_config_snapshot()
+
+        Args:
+            customer_id: Identificador do cliente no cofre.
+            device_id:   Identificador do dispositivo no cofre.
+            **kwargs:    Parâmetros extras repassados ao ``__init__``
+                         (ex: ``command``, ``timeout``).
+
+        Returns:
+            Instância de MikroTikDriver configurada.
+
+        Raises:
+            utils.vault.VaultError: Se houver problema com o cofre ou credenciais.
+        """
+        from utils.vault import VaultManager
+
+        vault = VaultManager()
+        creds = vault.get_credentials(customer_id, device_id)
+
+        return cls(
+            host=creds["host"],
+            username=creds["username"],
+            password=creds["password"],
+            port=creds.get("port", 22),
+            **kwargs,  # type: ignore[arg-type]
+        )
+
     def connect(self) -> None:
         """
         Abre a sessão SSH com o dispositivo MikroTik via Netmiko.
         Seta self.connected = True em caso de sucesso.
+
+        Segurança de logs:
+            Em caso de falha de autenticação, o erro logado contém apenas
+            host, porta e username — NUNCA a senha. Isso previne Data Leakage
+            via RotatingFileHandler.
 
         Raises
         ------
@@ -128,17 +174,31 @@ class MikroTikDriver(NetworkDeviceDriver):
                 "Sessão SSH estabelecida com %s (MikroTik RouterOS).", self.host
             )
         except NetmikoTimeoutException as exc:
-            self._logger.error("Timeout ao conectar em %s: %s", self.host, exc)
+            self._logger.error("Timeout ao conectar em %s:%d", self.host, self.port)
             raise ConnectionError(
                 f"Timeout ao tentar conectar em {self.host}:{self.port}."
             ) from exc
         except NetmikoAuthenticationException as exc:
+            # SEGURANÇA: loga apenas host e username — NUNCA a senha.
+            # A mensagem original do Netmiko pode conter credenciais.
             self._logger.error(
-                "Falha de autenticação em %s para o usuário '%s': %s",
-                self.host, self.username, exc,
+                "Falha de autenticação em %s para o usuário '%s'. "
+                "Verifique as credenciais no cofre.",
+                self.host, self.username,
             )
             raise ConnectionError(
                 f"Credenciais inválidas para {self.username}@{self.host}."
+            ) from exc
+        except Exception as exc:
+            # SEGURANÇA: captura genérica para evitar que exceções não
+            # previstas vazem credenciais no traceback logado.
+            self._logger.error(
+                "Erro inesperado ao conectar em %s:%d — %s: %s",
+                self.host, self.port, type(exc).__name__,
+                _sanitize_error(str(exc), self.password),
+            )
+            raise ConnectionError(
+                f"Erro ao conectar em {self.host}:{self.port}."
             ) from exc
 
     def disconnect(self) -> None:
@@ -398,3 +458,24 @@ class MikroTikDriver(NetworkDeviceDriver):
                     "Descartando rota inválida %s: %s", item, exc
                 )
         return routes
+
+
+# ─── Helpers de Segurança ─────────────────────────────────────────────────────
+
+def _sanitize_error(message: str, password: str) -> str:
+    """
+    Remove a senha de uma mensagem de erro para evitar Data Leakage nos logs.
+
+    Se a senha aparecer no traceback/mensagem de exceção (ex: Netmiko pode
+    incluí-la em erros de conexão), ela é substituída por ``'***'``.
+
+    Args:
+        message:  Texto do erro original.
+        password: Senha que deve ser mascarada.
+
+    Returns:
+        Mensagem sanitizada, sem credenciais expostas.
+    """
+    if password and password in message:
+        return message.replace(password, "***")
+    return message

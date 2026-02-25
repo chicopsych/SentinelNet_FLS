@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoria — {{ audit.hostname }} — {{ audit.audit_timestamp.strftime('%Y-%m-%d %H:%M') }}</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --text: #1e293b;
+            --muted: #64748b;
+            --card: #ffffff;
+            --dark: #0f172a;
+            --border: #e2e8f0;
+            --success: #22c55e;
+            --info: #3b82f6;
+            --warning: #eab308;
+            --orange: #f97316;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ── Header ─────────────────────────────────────────────── */
+        .header {
+            background: var(--dark);
+            color: #f1f5f9;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .header .subtitle {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        /* ── Badge de Severidade ────────────────────────────────── */
+        .severity-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1.25rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .severity-COMPLIANT { background: var(--success); }
+        .severity-LOW       { background: var(--info); }
+        .severity-MEDIUM    { background: var(--warning); color: var(--dark); }
+        .severity-HIGH      { background: var(--orange); }
+        .severity-CRITICAL  { background: var(--danger); }
+
+        /* ── Cards de Metadados ─────────────────────────────────── */
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .meta-card {
+            background: var(--card);
+            padding: 1.25rem;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+        .meta-card label {
+            display: block;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+            margin-bottom: 0.25rem;
+        }
+        .meta-card .value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* ── Seções ─────────────────────────────────────────────── */
+        .section {
+            background: var(--card);
+            padding: 1.5rem 2rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+        .section h2 {
+            font-size: 1.125rem;
+            color: var(--dark);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* ── Tabelas de Drift ───────────────────────────────────── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.625rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: #f1f5f9;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+        }
+        tr:hover td { background: #f8fafc; }
+
+        .sub-heading {
+            margin: 1rem 0 0.5rem 0;
+            font-size: 0.95rem;
+        }
+
+        .inline-pre {
+            margin: 0;
+            background: transparent;
+            color: inherit;
+            padding: 0.25rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .tag-added    { background: #dcfce7; color: #166534; }
+        .tag-removed  { background: #fee2e2; color: #991b1b; }
+        .tag-modified { background: #fef3c7; color: #92400e; }
+        .tag-position { background: #fee2e2; color: #991b1b; }
+        .tag-param    { background: #fef3c7; color: #92400e; }
+        .tag-missing  { background: #fee2e2; color: #991b1b; }
+        .tag-extra    { background: #dbeafe; color: #1e40af; }
+
+        /* ── JSON expandível ────────────────────────────────────── */
+        details {
+            margin-top: 0.5rem;
+        }
+        details summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--info);
+            font-size: 0.875rem;
+        }
+        pre {
+            background: var(--dark);
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            margin-top: 0.5rem;
+        }
+
+        /* ── Footer ─────────────────────────────────────────────── */
+        .footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.75rem;
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── Empty state ────────────────────────────────────────── */
+        .empty {
+            color: var(--muted);
+            font-style: italic;
+            padding: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ══ HEADER ══════════════════════════════════════════════════ -->
+    <div class="header">
+        <div>
+            <h1>SentinelNet_FLS — Relatório de Auditoria</h1>
+            <div class="subtitle">Audit ID: {{ audit.audit_id }}</div>
+        </div>
+        <span class="severity-badge severity-{{ audit.severity_label }}">
+            {{ audit.severity.emoji }} {{ audit.severity_label }}
+        </span>
+    </div>
+
+    <!-- ══ METADADOS ═══════════════════════════════════════════════ -->
+    <div class="meta-grid">
+        <div class="meta-card">
+            <label>Cliente</label>
+            <div class="value">{{ audit.customer_id }}</div>
+        </div>
+        <div class="meta-card">
+            <label>Dispositivo</label>
+            <div class="value">{{ audit.device_id }}</div>
+        </div>
+        <div class="meta-card">
+            <label>Hostname</label>
+            <div class="value">{{ audit.hostname }}</div>
+        </div>
+        <div class="meta-card">
+            <label>Data da Auditoria</label>
+            <div class="value">{{ audit.audit_timestamp.strftime('%Y-%m-%d %H:%M:%S') }} UTC</div>
+        </div>
+        {% if audit.baseline_collected_at %}
+        <div class="meta-card">
+            <label>Baseline Coletada Em</label>
+            <div class="value">{{ audit.baseline_collected_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</div>
+        </div>
+        {% endif %}
+        {% if audit.current_collected_at %}
+        <div class="meta-card">
+            <label>Estado Atual Coletado Em</label>
+            <div class="value">{{ audit.current_collected_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ══ RESUMO ══════════════════════════════════════════════════ -->
+    <div class="section">
+        <h2>Resumo</h2>
+        <p>{{ audit.drift_summary }}</p>
+    </div>
+
+    <!-- ══ DRIFT: CAMPOS ESCALARES ═════════════════════════════════ -->
+    {% set has_scalar_modified = [] %}
+    {% set has_scalar_added = [] %}
+    {% set has_scalar_removed = [] %}
+
+    {% for k, v in drift.get('modified', {}).items() %}
+        {% if v is mapping and 'expected' in v %}
+            {% if has_scalar_modified.append(1) %}{% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {% for k, v in drift.get('added', {}).items() %}
+        {% if not v is iterable or v is string %}
+            {% if has_scalar_added.append(1) %}{% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {% for k, v in drift.get('removed', {}).items() %}
+        {% if not v is iterable or v is string %}
+            {% if has_scalar_removed.append(1) %}{% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {% if has_scalar_modified or has_scalar_added or has_scalar_removed %}
+    <div class="section">
+        <h2>Campos Escalares</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Campo</th>
+                    <th>Tipo</th>
+                    <th>Esperado (Baseline)</th>
+                    <th>Atual (Coletado)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for k, v in drift.get('modified', {}).items() %}
+                    {% if v is mapping and 'expected' in v %}
+                    <tr>
+                        <td><strong>{{ k }}</strong></td>
+                        <td><span class="tag tag-modified">MODIFICADO</span></td>
+                        <td>{{ v.expected }}</td>
+                        <td>{{ v.actual }}</td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+                {% for k, v in drift.get('added', {}).items() %}
+                    {% if not v is iterable or v is string %}
+                    <tr>
+                        <td><strong>{{ k }}</strong></td>
+                        <td><span class="tag tag-added">ADICIONADO</span></td>
+                        <td>—</td>
+                        <td>{{ v }}</td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+                {% for k, v in drift.get('removed', {}).items() %}
+                    {% if not v is iterable or v is string %}
+                    <tr>
+                        <td><strong>{{ k }}</strong></td>
+                        <td><span class="tag tag-removed">REMOVIDO</span></td>
+                        <td>{{ v }}</td>
+                        <td>—</td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- ══ DRIFT: LISTAS (INTERFACES, ROUTES) ══════════════════════ -->
+    {% set list_fields = ['interfaces', 'routes'] %}
+    {% for field in list_fields %}
+        {% set modified_items = drift.get('modified', {}).get(field, []) %}
+        {% set added_items = drift.get('added', {}).get(field, []) %}
+        {% set removed_items = drift.get('removed', {}).get(field, []) %}
+
+        {% if modified_items or added_items or removed_items %}
+        <div class="section">
+            <h2>{{ field | capitalize }}</h2>
+
+            {% if modified_items %}
+            <h3 class="sub-heading">Modificados</h3>
+            <table>
+                <thead>
+                    <tr><th>Índice</th><th>Campo</th><th>Esperado</th><th>Atual</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in modified_items %}
+                        {% for field_name, change in item.get('changes', {}).items() %}
+                        <tr>
+                            <td>{{ item.index }}</td>
+                            <td><strong>{{ field_name }}</strong></td>
+                            <td>{{ change.expected }}</td>
+                            <td>{{ change.actual }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if added_items %}
+            <h3 class="sub-heading">Adicionados</h3>
+            <table>
+                <thead>
+                    <tr><th>Índice</th><th>Item</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in added_items %}
+                    <tr>
+                        <td>{{ item.index }}</td>
+                        <td><pre class="inline-pre">{{ json_dumps(item.item) }}</pre></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if removed_items %}
+            <h3 class="sub-heading">Removidos</h3>
+            <table>
+                <thead>
+                    <tr><th>Índice</th><th>Item</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in removed_items %}
+                    <tr>
+                        <td>{{ item.index }}</td>
+                        <td><pre class="inline-pre">{{ json_dumps(item.item) }}</pre></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% endif %}
+    {% endfor %}
+
+    <!-- ══ FIREWALL AUDIT ══════════════════════════════════════════ -->
+    {% set fw = drift.get('firewall_audit', {}) %}
+    {% set has_fw = fw.get('position_drift') or fw.get('parameter_drift') or fw.get('missing_rules') or fw.get('extra_rules') %}
+
+    {% if has_fw %}
+    <div class="section">
+        <h2>Auditoria de Firewall</h2>
+
+        <!-- Position Drift -->
+        {% if fw.get('position_drift') %}
+        <h3 class="sub-heading">
+            <span class="tag tag-position">CRITICAL</span> Position Drift (Risco de Shadowing)
+        </h3>
+        <table>
+            <thead>
+                <tr><th>Índice</th><th>Esperada</th><th>Encontrada</th></tr>
+            </thead>
+            <tbody>
+                {% for item in fw.position_drift %}
+                <tr>
+                    <td>{{ item.index }}</td>
+                    <td>{{ item.expected_comment }}</td>
+                    <td>{{ item.actual_comment }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- Parameter Drift -->
+        {% if fw.get('parameter_drift') %}
+        <h3 class="sub-heading">
+            <span class="tag tag-param">MEDIUM</span> Parameter Drift
+        </h3>
+        <table>
+            <thead>
+                <tr><th>Índice</th><th>Regra</th><th>Campo</th><th>Esperado</th><th>Atual</th></tr>
+            </thead>
+            <tbody>
+                {% for item in fw.parameter_drift %}
+                    {% for field_name, change in item.get('changes', {}).items() %}
+                    <tr>
+                        <td>{{ item.index }}</td>
+                        <td>{{ item.comment }}</td>
+                        <td><strong>{{ field_name }}</strong></td>
+                        <td>{{ change.expected }}</td>
+                        <td>{{ change.actual }}</td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- Missing Rules -->
+        {% if fw.get('missing_rules') %}
+        <h3 class="sub-heading">
+            <span class="tag tag-missing">HIGH</span> Regras Ausentes
+        </h3>
+        <table>
+            <thead>
+                <tr><th>Índice</th><th>Regra Esperada</th></tr>
+            </thead>
+            <tbody>
+                {% for item in fw.missing_rules %}
+                <tr>
+                    <td>{{ item.index }}</td>
+                    <td><pre class="inline-pre">{{ json_dumps(item.rule) }}</pre></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- Extra Rules -->
+        {% if fw.get('extra_rules') %}
+        <h3 class="sub-heading">
+            <span class="tag tag-extra">HIGH</span> Regras Não Documentadas
+        </h3>
+        <table>
+            <thead>
+                <tr><th>Índice</th><th>Regra Encontrada</th></tr>
+            </thead>
+            <tbody>
+                {% for item in fw.extra_rules %}
+                <tr>
+                    <td>{{ item.index }}</td>
+                    <td><pre class="inline-pre">{{ json_dumps(item.rule) }}</pre></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ══ JSON COMPLETO ═══════════════════════════════════════════ -->
+    <div class="section">
+        <h2>Dados Brutos</h2>
+        <details>
+            <summary>Expandir JSON completo do relatório</summary>
+            <pre>{{ json_dumps(drift) }}</pre>
+        </details>
+    </div>
+
+    <!-- ══ FOOTER ══════════════════════════════════════════════════ -->
+    <div class="footer">
+        <p>Gerado por <strong>SentinelNet_FLS</strong> &mdash; {{ audit.audit_timestamp.strftime('%Y-%m-%d %H:%M:%S') }} UTC</p>
+    </div>
+
+</body>
+</html>
