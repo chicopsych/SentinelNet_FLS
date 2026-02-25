@@ -66,6 +66,11 @@ def demo_diff_engine() -> None:
     )
 
     # ── Current: estado real com drift simulado ───────────────────────────
+    # Cenários de Firewall Drift demonstrados:
+    #   [0] POSITION DRIFT: "Allow SSH" substituída por "Allow Ping" (troca)
+    #   [1] POSITION DRIFT: "Allow Ping" substituída por "Allow SSH" (troca)
+    #   [2] PARAMETER DRIFT: "Drop All Input" action mudou para "reject"
+    #   [3] EXTRA RULE: regra nova não documentada na baseline
     current = DeviceConfig(
         hostname="borda-01",
         vendor="mikrotik",
@@ -101,10 +106,14 @@ def demo_diff_engine() -> None:
             # DRIFT: rota 10.10.0.0/16 removida (baseline tem 2, current tem 1)
         ],
         firewall_rules=[
-            # DRIFT: SSH mudou de accept para drop
-            FirewallRule(chain="input", action="drop", protocol="tcp", dst_port="22", comment="Block SSH"),
+            # POSITION DRIFT: técnico inverteu posições das regras 0 e 1
+            # Risco de SHADOWING: "Allow Ping" agora está antes de "Allow SSH"
             FirewallRule(chain="input", action="accept", protocol="icmp", comment="Allow Ping"),
-            FirewallRule(chain="input", action="drop", comment="Drop All Input"),
+            FirewallRule(chain="input", action="accept", protocol="tcp", dst_port="22", comment="Allow SSH"),
+            # PARAMETER DRIFT: regra mantém comment mas action mudou
+            FirewallRule(chain="input", action="reject", comment="Drop All Input"),
+            # EXTRA RULE: regra nova não documentada na baseline
+            FirewallRule(chain="forward", action="accept", src_address="192.168.88.0/24", comment="Guest Forward"),
         ],
     )
 
