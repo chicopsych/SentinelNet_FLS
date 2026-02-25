@@ -1,0 +1,61 @@
+<!--
+Template TTP: /ip route - saida do MikroTik /export verbose
+
+Recebe apenas a secao /ip route pre-extraida pelo driver (_extract_section).
+Estrategia identica ao template de firewall: captura cada linha add como _line_
+PHRASE e usa macro Python para mapear key=value para o schema Route.
+
+O macro retorna None para descartar linhas sem dst-address.
+-->
+
+<macro>
+def parse_route_line(data):
+    import re
+    line = data.get("_line_", "")
+    if not line.strip():
+        return None
+
+    pairs = re.findall(r'([\w-]+)=("(?:[^"\\]|\\.)*"|[^ ]+)', line)
+    raw = {k: v.strip('"') for k, v in pairs}
+
+    result = {}
+
+    # destination: dst-address e obrigatorio
+    dst = raw.get("dst-address", "")
+    if not dst:
+        return None
+    result["destination"] = dst
+
+    # gateway: pode ser IP ou nome de interface
+    gw = raw.get("gateway", "")
+
+    # Detecta se gateway e um IP ou nome de interface
+    if gw and re.match(r'^\d{1,3}(\.\d{1,3}){3}$', gw):
+        result["gateway"] = gw
+        result["interface"] = raw.get("interface", None) or None
+    elif gw:
+        # gateway e um nome de interface
+        result["gateway"] = None
+        result["interface"] = gw
+    else:
+        result["gateway"] = None
+        result["interface"] = None
+
+    # distance administrativa (default 1)
+    try:
+        result["distance"] = int(raw.get("distance", "1"))
+    except ValueError:
+        result["distance"] = 1
+
+    # route_type: /export verbose nao emite tipo para rotas estaticas
+    result["route_type"] = "static"
+
+    data.update(result)
+    data.pop("_line_", None)
+    return data
+</macro>
+
+<group name="routes" macro="parse_route_line">
+add {{ _line_ | PHRASE }}
+</group>
+

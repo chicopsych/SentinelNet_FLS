@@ -22,7 +22,7 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 - Reduzir impacto de mudanças manuais fora de processo
 - Aumentar previsibilidade operacional em ambientes multi-cliente
 - Gerar base de evidência para auditorias internas e externas
-- Permitir evolução incremental para múltiplos vendors
+- Permitir evolução incremental para múltiplos fabricantes
 
 ---
 
@@ -42,7 +42,7 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 2. O driver do fabricante realiza conexão segura no ativo.
 3. A configuração bruta é coletada (*running config* ou equivalente).
 4. O parser converte texto não estruturado em objetos JSON normalizados.
-5. O mecanismo de diff compara baseline x estado real.
+5. O Diff Engine compara baseline x estado real.
 6. O sistema grava relatório com os desvios encontrados.
 
 Esse fluxo desacopla coleta, parsing e auditoria, facilitando manutenção e evolução do projeto.
@@ -77,14 +77,14 @@ O projeto segue o padrão **Strategy**, mantendo o núcleo desacoplado das parti
 
 ---
 
-## 🧰 Stack Técnica (proposta)
+## 🧰 Stack Técnica
 
 - **Python 3.10+**
 - **Netmiko** (coleta via SSH)
 - **TTP / TextFSM** (parsing)
 - **Pydantic** (validação de schema)
 - **SQLite** (opcional para histórico)
-- **Logging nativo do Python** (observabilidade básica)
+- **Logging nativo do Python + RotatingFileHandler** (observabilidade básica)
 
 ---
 
@@ -98,7 +98,10 @@ SentinelNet_FLS/
 │   └── schemas.py
 ├── drivers/                    # Drivers por fabricante
 │   └── __init__.py
-├── internalloggin/             # Módulo reservado para logging interno
+├── internalloggin/             # Logging interno centralizado
+│   ├── __init__.py
+│   ├── logger.py
+│   └── internallogs/           # Arquivos .log gerados pela aplicação
 ├── inventory/                  # Inventário e dados por cliente
 │   ├── customer/
 │   │   └── customer.py
@@ -163,7 +166,7 @@ Para garantir entregas rápidas e validar valor cedo, o MVP pode focar em:
 
 ## 🛠️ Roadmap de Execução (Task List)
 
-Esta sequência prioriza base sólida antes de aumentar escopo multi-vendor.
+Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricante.
 
 1. [x] **Task 01: Definição do Schema JSON** ✅
    - Modelar entidades (interfaces, rotas, firewall, usuários) com `Pydantic`
@@ -187,8 +190,10 @@ Esta sequência prioriza base sólida antes de aumentar escopo multi-vendor.
 	- Comparar baseline x estado atual
 	- Identificar ausência, adição e alteração de valores
 
-6. [ ] **Task 06: Módulo de Relatório/Logging**
-	- Persistir resultados em log estruturado
+6. [ ] **Task 06: Módulo de Relatório e Logging**
+	- ✅ Logging interno centralizado implementado (`internalloggin/logger.py`)
+	- ✅ Integração inicial aplicada em `main.py`, `core/base_driver.py` e `inventory/customer/customer.py`
+	- Persistir resultados em logs estruturados de auditoria
 	- Opcional: persistência em SQLite para histórico
 
 7. [ ] **Task 07: Sistema de Gestão de Credenciais**

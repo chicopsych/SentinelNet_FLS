@@ -1,0 +1,54 @@
+<!--
+Template TTP: /ip firewall filter - saida do MikroTik /export verbose
+
+Recebe apenas a secao /ip firewall filter pre-extraida pelo driver
+(_extract_section). Cada linha 'add key=value ...' e capturada como _line_ PHRASE
+e processada pelo macro Python que converte os pares key=value para os campos
+do schema FirewallRule.
+
+O macro retorna None para descartar linhas invalidas (sem chain/action).
+-->
+
+<macro>
+def parse_fw_line(data):
+    import re
+    line = data.get("_line_", "")
+    if not line.strip():
+        return None
+
+    # Captura key="quoted value" e key=unquoted-value
+    pairs = re.findall(r'([\w-]+)=("(?:[^"\\]|\\.)*"|[^ ]+)', line)
+    raw = {k: v.strip('"') for k, v in pairs}
+
+    # Normalizacao RouterOS -> schema FirewallRule
+    rename = {
+        "src-address": "src_address",
+        "dst-address": "dst_address",
+        "src-port":    "src_port",
+        "dst-port":    "dst_port",
+    }
+    result = {}
+    for ros_key, schema_key in rename.items():
+        val = raw.get(ros_key, "")
+        result[schema_key] = val if val else None
+
+    # Campos diretos (vazio vira None)
+    for field in ("chain", "action", "protocol", "comment"):
+        val = raw.get(field, "")
+        result[field] = val if val else None
+
+    # disabled: RouterOS exporta yes/no
+    result["disabled"] = raw.get("disabled", "no").lower() == "yes"
+
+    # chain e action sao obrigatorios
+    if not result.get("chain") or not result.get("action"):
+        return None
+
+    data.update(result)
+    data.pop("_line_", None)
+    return data
+</macro>
+
+<group name="firewall_rules" macro="parse_fw_line">
+add {{ _line_ | PHRASE }}
+</group>
