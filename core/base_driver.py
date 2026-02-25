@@ -39,6 +39,7 @@ from types import TracebackType
 from typing import Optional, Type
 
 from core.schemas import DeviceConfig
+from internalloggin.logger import setup_logger
 
 
 class NetworkDeviceDriver(ABC):
@@ -82,7 +83,7 @@ class NetworkDeviceDriver(ABC):
 
         # Logger nomeado com a classe concreta, ex: "drivers.mikrotik_driver"
         # Permite filtrar logs por fabricante em ambientes multi-vendor.
-        self._logger: logging.Logger = logging.getLogger(
+        self._logger: logging.Logger = setup_logger(
             self.__class__.__module__ + "." + self.__class__.__name__
         )
 

@@ -15,6 +15,8 @@ customer.py
 Definição da classe base para drivers de clientes.
 """
 
+from internalloggin.logger import setup_logger
+
 class Customer:
     """
     Classe base para drivers de clientes.
@@ -33,6 +35,8 @@ class Customer:
                             para os dispositivos do cliente.
         """
         self.inventory_data = inventory_data
+        self.logger = setup_logger(self.__class__.__module__ + "." + self.__class__.__name__)
+        self.logger.debug("Customer inicializado com inventory_data.")
 
     def collect_inventory(self) -> dict:
         """
@@ -42,4 +46,5 @@ class Customer:
         Returns:
             Um dicionário contendo as informações coletadas do inventário.
         """
+        self.logger.error("collect_inventory() não implementado na subclasse.")
         raise NotImplementedError("Este método deve ser implementado por subclasses.")

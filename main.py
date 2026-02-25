@@ -12,23 +12,13 @@ Fluxo esperado (a implementar nas Tasks seguintes):
     6. Persistir relatório de desvios (Task 06).
 """
 
-import logging
-import sys
+from internalloggin.logger import setup_logger
 
 
-def setup_logging() -> None:
-    """Configura o logger raiz para saída formatada no console."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stdout,
-    )
+logger = setup_logger(__name__)
 
 
 def main() -> None:
-    setup_logging()
-    logger = logging.getLogger(__name__)
     logger.info("SentinelNet_FLS iniciado.")
     # TODO (Task 03+): Integrar driver MikroTik, Diff Engine e Relatório.
     logger.info("Nenhum driver configurado ainda. Implementar Tasks 03–06.")
