@@ -1,0 +1,8 @@
+# logs/
+# Diretório para armazenar os relatórios de auditoria e histórico de desvios.
+#
+# Arquivos gerados pelo sistema (exemplos):
+#   audit_<cliente>_<YYYY-MM-DD>.log
+#   drift_report_<hostname>_<timestamp>.json
+#
+# Este diretório NÃO deve ser versionado em Git (adicione logs/ ao .gitignore).

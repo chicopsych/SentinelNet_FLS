@@ -1,0 +1,10 @@
+# inventory/
+# Diretório para armazenar os arquivos de Baseline (Golden Config) por cliente/site.
+#
+# Estrutura recomendada:
+#   inventory/
+#   └── <cliente>/
+#       └── <hostname>.json       (DeviceConfig serializado)
+#
+# Cada arquivo .json deve ser versionável em Git e representa
+# o estado ESPERADO do dispositivo — a "Fonte Única da Verdade".

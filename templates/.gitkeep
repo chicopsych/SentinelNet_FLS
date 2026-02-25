@@ -1,0 +1,11 @@
+# templates/
+# Diretório para templates de parsing TTP/TextFSM.
+#
+# Convenção de nomenclatura dos arquivos:
+#   <vendor>_<subsistema>.ttp
+#
+# Exemplos:
+#   mikrotik_interfaces.ttp
+#   mikrotik_routes.ttp
+#   mikrotik_firewall.ttp
+#   cisco_interfaces.ttp

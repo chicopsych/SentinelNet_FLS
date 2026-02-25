@@ -1,0 +1,17 @@
+# ─── Validação de Dados / Schemas ────────────────────────────────────────────
+# Pydantic v2: validação de modelos, tipagem estática em runtime e serialização
+# JSON nativa. A v2 foi reescrita em Rust (via pydantic-core) e tem uma API
+# distinta da v1 — exige ConfigDict em vez do bloco "class Config" legado.
+pydantic>=2.0
+
+# ─── Conectividade SSH Multi-Vendor ──────────────────────────────────────────
+# Netmiko: biblioteca de SSH construída sobre Paramiko, porém com suporte a
+# dezenas de fabricantes (MikroTik, Cisco, Juniper, etc.). Abstrai diferenças
+# de prompt, paginação e autenticação.
+netmiko>=4.0
+
+# ─── Parsing de Saída CLI ────────────────────────────────────────────────────
+# TTP (Template Text Parser): converte texto semi-estruturado de CLIs
+# proprietárias em objetos Python/JSON usando templates declarativos.
+# Alternativa ao TextFSM com sintaxe mais próxima do Jinja2.
+ttp>=0.9
