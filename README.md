@@ -34,6 +34,14 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 - **Relatórios de Auditoria:** registro de discrepâncias com contexto
 - **Arquitetura Multi-Vendor:** suporte extensível por drivers modulares
 
+### ✅ Implementações já concluídas
+
+- **Schema de configuração (Pydantic):** modelos completos em `core/schemas.py` para interfaces, rotas, regras de firewall e `DeviceConfig`.
+- **Driver base abstrato:** contrato comum e suporte a context manager em `core/base_driver.py`.
+- **Driver MikroTik (MVP inicial):** conexão SSH via Netmiko, coleta com `/export verbose`, parsing de cabeçalho e montagem de `DeviceConfig` em `drivers/mikrotik_driver.py`.
+- **Parsing TTP para MikroTik:** templates para rotas e firewall em `templates/mikrotik_routes.ttp` e `templates/mikrotik_firewall.ttp`.
+- **Logging interno centralizado:** `internalloggin/logger.py` com `RotatingFileHandler`, integração ativa no `main.py`, `core/base_driver.py` e `inventory/customer/customer.py`.
+
 ---
 
 ## 🔄 Fluxo de Funcionamento
@@ -92,26 +100,33 @@ O projeto segue o padrão **Strategy**, mantendo o núcleo desacoplado das parti
 
 ```text
 SentinelNet_FLS/
+├── .gitignore
+├── README.md
 ├── core/                       # Núcleo da auditoria e contratos base
 │   ├── __init__.py
 │   ├── base_driver.py
 │   └── schemas.py
 ├── drivers/                    # Drivers por fabricante
-│   └── __init__.py
+│   ├── __init__.py
+│   └── mikrotik_driver.py
 ├── internalloggin/             # Logging interno centralizado
 │   ├── __init__.py
 │   ├── logger.py
-│   └── internallogs/           # Arquivos .log gerados pela aplicação
 ├── inventory/                  # Inventário e dados por cliente
+│   ├── .gitkeep
 │   ├── customer/
 │   │   └── customer.py
 │   └── inventorycreator.py
 ├── logs/                       # Saídas/histórico de execução
+│   └── .gitkeep
 ├── templates/                  # Templates de parsing (TTP/TextFSM)
+│   ├── .gitkeep
+│   ├── __init__.py
+│   ├── mikrotik_firewall.ttp
+│   └── mikrotik_routes.ttp
 ├── utils/                      # Utilitários compartilhados
 │   └── __init__.py
 ├── main.py                     # Ponto de entrada da aplicação
-├── README.md
 └── requirements.txt            # Dependências do projeto
 ```
 
@@ -179,12 +194,15 @@ Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricant
    - **Entregável:** `core/base_driver.py` — classe `NetworkDeviceDriver(ABC)` com context manager
 
 3. [ ] **Task 03: Desenvolvimento do Driver MikroTik (MVP)**
-	- Implementar conexão via `Netmiko`
-	- Capturar saída de configuração (`/export`)
+	- ✅ Implementar conexão via `Netmiko`
+	- ✅ Capturar saída de configuração (`/export verbose`)
+	- ✅ Extrair metadados de cabeçalho (hostname/model/version)
+	- ⏳ Pendente: integrar execução ponta a ponta no fluxo principal
 
 4. [ ] **Task 04: Criação dos Templates de Parsing (TTP)**
-	- Converter saída textual em JSON normalizado
-	- Cobrir blocos críticos do MVP
+	- ✅ Converter saída textual em JSON normalizado (rotas e firewall)
+	- ✅ Templates criados em `templates/mikrotik_routes.ttp` e `templates/mikrotik_firewall.ttp`
+	- ⏳ Pendente: ampliar cobertura para interfaces e demais blocos do MVP
 
 5. [ ] **Task 05: Construção do Diff Engine**
 	- Comparar baseline x estado atual
@@ -201,6 +219,25 @@ Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricant
 	- Garantir uso seguro em ambientes multi-cliente
 
 ---
+🤖 Integração com IA & OpenClaw.ai (Futuro)
+O projeto está sendo construído com foco em interoperabilidade com agentes de IA. A estrutura de dados em JSON e a validação via Pydantic permitem que o SentinelNet_FLS atue como um provedor de contexto para LLMs através do protocolo MCP (Model Context Protocol) e orquestradores como o OpenClaw.
+
+Plano de Implementação:
+Exposição como MCP Server:
+
+Criar um wrapper para transformar as funções de auditoria em ferramentas (tools) consumíveis por IAs.
+
+Permitir que agentes solicitem auditorias em tempo real via comandos de voz ou chat.
+
+Análise de Desvio Assistida (AI Drift Analysis):
+
+Enviar o diferencial (diff) gerado pelo sistema para o OpenClaw para interpretação semântica.
+
+Exemplo: "A IA identifica que a alteração na regra de firewall X abre uma vulnerabilidade para o serviço de banco de dados do cliente."
+
+Remediação Sugerida:
+
+Utilizar modelos de linguagem para sugerir os comandos CLI exatos necessários para retornar o equipamento ao estado da Baseline, baseando-se nos desvios detectados.
 
 ## ✅ Critérios de Sucesso (MVP)
 

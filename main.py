@@ -12,16 +12,122 @@ Fluxo esperado (a implementar nas Tasks seguintes):
     6. Persistir relatório de desvios (Task 06).
 """
 
+import json
+
+from core import DiffEngine
+from core.schemas import DeviceConfig, FirewallRule, Interface, InterfaceType, Route
 from internalloggin.logger import setup_logger
 
 
 logger = setup_logger(__name__)
 
 
+def demo_diff_engine() -> None:
+    """
+    Demonstração do Diff Engine (Task 05).
+
+    Cria dois DeviceConfig fabricados — um baseline e um com drift
+    simulado — e executa a comparação para validar a detecção de
+    adições, remoções e modificações.
+    """
+    logger.info("── Demo: Diff Engine (Task 05) ──")
+
+    # ── Baseline: estado esperado ─────────────────────────────────────────
+    baseline = DeviceConfig(
+        hostname="borda-01",
+        vendor="mikrotik",
+        model="CCR1036-8G-2S+",
+        os_version="7.14",
+        interfaces=[
+            Interface(
+                name="ether1",
+                interface_type=InterfaceType.ETHER,
+                ip_addresses=["192.168.1.1/24"],
+                enabled=True,
+                comment="Uplink ISP",
+            ),
+            Interface(
+                name="ether2",
+                interface_type=InterfaceType.ETHER,
+                ip_addresses=["10.0.0.1/30"],
+                enabled=True,
+                comment="LAN Core",
+            ),
+        ],
+        routes=[
+            Route(destination="0.0.0.0/0", gateway="192.168.1.254", interface="ether1"),
+            Route(destination="10.10.0.0/16", gateway="10.0.0.2", interface="ether2"),
+        ],
+        firewall_rules=[
+            FirewallRule(chain="input", action="accept", protocol="tcp", dst_port="22", comment="Allow SSH"),
+            FirewallRule(chain="input", action="accept", protocol="icmp", comment="Allow Ping"),
+            FirewallRule(chain="input", action="drop", comment="Drop All Input"),
+        ],
+    )
+
+    # ── Current: estado real com drift simulado ───────────────────────────
+    current = DeviceConfig(
+        hostname="borda-01",
+        vendor="mikrotik",
+        model="CCR1036-8G-2S+",
+        os_version="7.15",  # DRIFT: OS atualizado sem aprovação
+        interfaces=[
+            Interface(
+                name="ether1",
+                interface_type=InterfaceType.ETHER,
+                ip_addresses=["192.168.1.1/24"],
+                enabled=True,
+                comment="Uplink ISP",
+            ),
+            # DRIFT: ether2 mudou IP
+            Interface(
+                name="ether2",
+                interface_type=InterfaceType.ETHER,
+                ip_addresses=["10.0.0.5/30"],  # era 10.0.0.1/30
+                enabled=True,
+                comment="LAN Core",
+            ),
+            # DRIFT: interface adicionada sem aprovação
+            Interface(
+                name="ether3",
+                interface_type=InterfaceType.ETHER,
+                ip_addresses=["172.16.0.1/24"],
+                enabled=True,
+                comment="Rede Convidados",
+            ),
+        ],
+        routes=[
+            Route(destination="0.0.0.0/0", gateway="192.168.1.254", interface="ether1"),
+            # DRIFT: rota 10.10.0.0/16 removida (baseline tem 2, current tem 1)
+        ],
+        firewall_rules=[
+            # DRIFT: SSH mudou de accept para drop
+            FirewallRule(chain="input", action="drop", protocol="tcp", dst_port="22", comment="Block SSH"),
+            FirewallRule(chain="input", action="accept", protocol="icmp", comment="Allow Ping"),
+            FirewallRule(chain="input", action="drop", comment="Drop All Input"),
+        ],
+    )
+
+    # ── Executa comparação ────────────────────────────────────────────────
+    report = DiffEngine.compare(baseline, current)
+
+    logger.info("Resultado da Auditoria:")
+    logger.info(json.dumps(report.to_dict(), indent=2, ensure_ascii=False, default=str))
+
+    if report.has_drift:
+        logger.error("AUDITORIA CONCLUÍDA: Desvios detectados! — %s", report.summary())
+    else:
+        logger.info("AUDITORIA CONCLUÍDA: Equipamento em conformidade.")
+
+
 def main() -> None:
     logger.info("SentinelNet_FLS iniciado.")
-    # TODO (Task 03+): Integrar driver MikroTik, Diff Engine e Relatório.
-    logger.info("Nenhum driver configurado ainda. Implementar Tasks 03–06.")
+
+    # Demonstração do Diff Engine — remover/substituir quando o fluxo
+    # completo (inventário → driver → diff → relatório) estiver pronto.
+    demo_diff_engine()
+
+    # TODO (Task 06): Integrar geração de relatório de desvios.
 
 
 if __name__ == "__main__":
