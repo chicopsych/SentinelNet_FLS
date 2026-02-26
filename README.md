@@ -64,24 +64,28 @@ O projeto segue o padrão **Strategy**, mantendo o núcleo desacoplado das parti
 ### Camadas principais
 
 1. **Core Engine**
-	- Coordena o ciclo de auditoria
-	- Invoca parser, comparador e logger
-	- Define regras de comparação e severidade
 
-2. **Drivers Layer**
-	- Implementa conexão/coleta por vendor
-	- Isola comandos e diferenças de protocolo
-	- Facilita inclusão de novos fabricantes sem alterar o core
+- Coordena o ciclo de auditoria
+- Invoca parser, comparador e logger
+- Define regras de comparação e severidade
 
-3. **Baseline (JSON)**
-	- Representa o estado esperado por cliente, site ou dispositivo
-	- Pode ser versionado em Git
-	- Serve como referência para compliance
+1. **Drivers Layer**
 
-4. **Parser (TTP/TextFSM)**
-	- Converte CLI textual em estrutura previsível
-	- Permite comparação por campos semânticos
-	- Reduz ruído de formatação textual
+- Implementa conexão/coleta por vendor
+- Isola comandos e diferenças de protocolo
+- Facilita inclusão de novos fabricantes sem alterar o core
+
+1. **Baseline (JSON)**
+
+- Representa o estado esperado por cliente, site ou dispositivo
+- Pode ser versionado em Git
+- Serve como referência para compliance
+
+1. **Parser (TTP/TextFSM)**
+
+- Converte CLI textual em estrutura previsível
+- Permite comparação por campos semânticos
+- Reduz ruído de formatação textual
 
 ---
 
@@ -194,52 +198,60 @@ Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricant
    - **Entregável:** `core/base_driver.py` — classe `NetworkDeviceDriver(ABC)` com context manager
 
 3. [ ] **Task 03: Desenvolvimento do Driver MikroTik (MVP)**
-	- ✅ Implementar conexão via `Netmiko`
-	- ✅ Capturar saída de configuração (`/export verbose`)
-	- ✅ Extrair metadados de cabeçalho (hostname/model/version)
-	- ⏳ Pendente: integrar execução ponta a ponta no fluxo principal
 
-4. [ ] **Task 04: Criação dos Templates de Parsing (TTP)**
-	- ✅ Converter saída textual em JSON normalizado (rotas e firewall)
-	- ✅ Templates criados em `templates/mikrotik_routes.ttp` e `templates/mikrotik_firewall.ttp`
-	- ⏳ Pendente: ampliar cobertura para interfaces e demais blocos do MVP
+- ✅ Implementar conexão via `Netmiko`
+- ✅ Capturar saída de configuração (`/export verbose`)
+- ✅ Extrair metadados de cabeçalho (hostname/model/version)
+- ⏳ Pendente: integrar execução ponta a ponta no fluxo principal
 
-5. [ ] **Task 05: Construção do Diff Engine**
-	- Comparar baseline x estado atual
-	- Identificar ausência, adição e alteração de valores
+1. [ ] **Task 04: Criação dos Templates de Parsing (TTP)**
 
-6. [ ] **Task 06: Módulo de Relatório e Logging**
-	- ✅ Logging interno centralizado implementado (`internalloggin/logger.py`)
-	- ✅ Integração inicial aplicada em `main.py`, `core/base_driver.py` e `inventory/customer/customer.py`
-	- Persistir resultados em logs estruturados de auditoria
-	- Opcional: persistência em SQLite para histórico
+- ✅ Converter saída textual em JSON normalizado (rotas e firewall)
+- ✅ Templates criados em `templates/mikrotik_routes.ttp` e `templates/mikrotik_firewall.ttp`
+- ⏳ Pendente: ampliar cobertura para interfaces e demais blocos do MVP
 
-7. [ ] **Task 07: Sistema de Gestão de Credenciais**
-	- Integrar variáveis de ambiente/cofre de segredos
-	- Garantir uso seguro em ambientes multi-cliente
+1. [ ] **Task 05: Construção do Diff Engine**
 
-8. [ ] **Task 08: Exposição como MCP Server**
-	- Implementar módulo `mcp/server.py` que envolve as funções de auditoria como *tools* consumíveis pelo protocolo MCP (Model Context Protocol)
-	- Definir schemas de entrada/saída das ferramentas usando Pydantic, garantindo compatibilidade com qualquer orquestrador compatível com MCP (OpenClaw, Claude Desktop, etc.)
-	- Expor endpoint HTTP/SSE para que agentes de IA possam solicitar auditorias em tempo real via chat ou voz
-	- Implementar autenticação por token (Bearer) para proteger o servidor MCP contra acesso não autorizado
-	- Cobrir o servidor com testes unitários e de integração
-	- **Entregável:** `mcp/server.py`, `mcp/tool_schemas.py`, `mcp/__init__.py`
+- Comparar baseline x estado atual
+- Identificar ausência, adição e alteração de valores
 
-9. [ ] **Task 09: Análise de Desvio Assistida por IA (AI Drift Analysis)**
-	- Criar módulo `ai/drift_analyzer.py` responsável por serializar o diff produzido pelo Diff Engine e enviá-lo a um LLM (OpenAI/OpenClaw) via chamada de API
-	- Definir prompt de sistema especializado em segurança de redes para guiar a interpretação semântica das alterações detectadas
-	- Mapear a severidade retornada pelo modelo para os níveis de criticidade já definidos no projeto (`INFO`, `WARNING`, `CRITICAL`)
-	- Garantir *fallback* gracioso quando a API de IA estiver indisponível, registrando o diff sem análise semântica e continuando o fluxo normal de auditoria
-	- Implementar cache de respostas para evitar chamadas repetidas ao LLM para diffs idênticos
-	- **Entregável:** `ai/drift_analyzer.py`, `ai/prompt_templates.py`, `ai/__init__.py`
+1. [ ] **Task 06: Módulo de Relatório e Logging**
 
-10. [ ] **Task 10: Remediação Sugerida por IA**
-	- Criar módulo `ai/remediation.py` que recebe os desvios classificados e solicita ao LLM a geração dos comandos CLI exatos para retornar o dispositivo ao estado da Baseline
-	- Validar os comandos sugeridos contra um conjunto de padrões permitidos (*allowlist*) antes de apresentá-los ao operador, prevenindo execução de comandos destrutivos
-	- Apresentar as sugestões em relatório estruturado (JSON + Markdown), incluindo risco estimado de cada remediação e possível impacto operacional
-	- Integrar o módulo ao fluxo de auditoria existente como etapa opcional, acionável por flag de linha de comando (`--suggest-remediation`)
-	- **Entregável:** `ai/remediation.py`, atualização em `main.py` para suportar a nova flag
+- ✅ Logging interno centralizado implementado (`internalloggin/logger.py`)
+- ✅ Integração inicial aplicada em `main.py`, `core/base_driver.py` e `inventory/customer/customer.py`
+- Persistir resultados em logs estruturados de auditoria
+- Opcional: persistência em SQLite para histórico
+
+1. [ ] **Task 07: Sistema de Gestão de Credenciais**
+
+- Integrar variáveis de ambiente/cofre de segredos
+- Garantir uso seguro em ambientes multi-cliente
+
+1. [ ] **Task 08: Exposição como MCP Server**
+
+- Implementar módulo `mcp/server.py` que envolve as funções de auditoria como *tools* consumíveis pelo protocolo MCP (Model Context Protocol)
+- Definir schemas de entrada/saída das ferramentas usando Pydantic, garantindo compatibilidade com qualquer orquestrador compatível com MCP (OpenClaw, Claude Desktop, etc.)
+- Expor endpoint HTTP/SSE para que agentes de IA possam solicitar auditorias em tempo real via chat ou voz
+- Implementar autenticação por token (Bearer) para proteger o servidor MCP contra acesso não autorizado
+- Cobrir o servidor com testes unitários e de integração
+- **Entregável:** `mcp/server.py`, `mcp/tool_schemas.py`, `mcp/__init__.py`
+
+1. [ ] **Task 09: Análise de Desvio Assistida por IA (AI Drift Analysis)**
+
+- Criar módulo `ai/drift_analyzer.py` responsável por serializar o diff produzido pelo Diff Engine e enviá-lo a um LLM (OpenAI/OpenClaw) via chamada de API
+- Definir prompt de sistema especializado em segurança de redes para guiar a interpretação semântica das alterações detectadas
+- Mapear a severidade retornada pelo modelo para os níveis de criticidade já definidos no projeto (`INFO`, `WARNING`, `CRITICAL`)
+- Garantir *fallback* gracioso quando a API de IA estiver indisponível, registrando o diff sem análise semântica e continuando o fluxo normal de auditoria
+- Implementar cache de respostas para evitar chamadas repetidas ao LLM para diffs idênticos
+- **Entregável:** `ai/drift_analyzer.py`, `ai/prompt_templates.py`, `ai/__init__.py`
+
+1. [ ] **Task 10: Remediação Sugerida por IA**
+
+- Criar módulo `ai/remediation.py` que recebe os desvios classificados e solicita ao LLM a geração dos comandos CLI exatos para retornar o dispositivo ao estado da Baseline
+- Validar os comandos sugeridos contra um conjunto de padrões permitidos (*allowlist*) antes de apresentá-los ao operador, prevenindo execução de comandos destrutivos
+- Apresentar as sugestões em relatório estruturado (JSON + Markdown), incluindo risco estimado de cada remediação e possível impacto operacional
+- Integrar o módulo ao fluxo de auditoria existente como etapa opcional, acionável por flag de linha de comando (`--suggest-remediation`)
+- **Entregável:** `ai/remediation.py`, atualização em `main.py` para suportar a nova flag
 
 ---
 
