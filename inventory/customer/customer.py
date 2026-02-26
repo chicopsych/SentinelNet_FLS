@@ -17,6 +17,21 @@ Definição da classe base para drivers de clientes.
 
 from internalloggin.logger import setup_logger
 
+
+# ── Inventário de dispositivos ────────────────────────────────────────────────
+# Cada entrada define o customer_id, device_id e vendor do dispositivo.
+# O host e as credenciais residem EXCLUSIVAMENTE no VaultManager (inventory/vault.enc)
+# e nunca devem ser inseridos aqui.
+
+DEVICE_INVENTORY: list[dict] = [
+    {
+        "customer_id": "cliente_a",
+        "device_id":   "borda-01",
+        "vendor":      "mikrotik",
+    },
+]
+
+
 class Customer:
     """
     Classe base para drivers de clientes.

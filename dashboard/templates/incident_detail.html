@@ -63,30 +63,191 @@
   </div>
 </div>
 
-<!-- ── Diff Baseline x Atual ──────────────────────────────────────────── -->
+<!-- ── Diff Baseline × Atual ───────────────────────────────────────────── -->
+{% set diff = incident.diff_data.get('diff', {}) if incident.diff_data else {} %}
+{% set modified  = diff.get('modified', {}) %}
+{% set added     = diff.get('added', {}) %}
+{% set removed   = diff.get('removed', {}) %}
+{% set fw_audit  = diff.get('firewall_audit', {}) %}
+{% set has_diff  = modified or added or removed or fw_audit.values() | selectattr('__len__') | list %}
+
 <div class="card border-0 shadow-sm mb-4">
-  <div class="card-header bg-white fw-semibold">
-    <i class="bi bi-file-diff me-1 text-warning"></i>Diff — Baseline vs Estado Atual
+  <div class="card-header bg-white fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-file-diff text-warning"></i>
+    Diff — Baseline vs Estado Atual
   </div>
-  <div class="card-body p-0">
-    {% if incident.diff %}
-    <pre class="sentinelnet-diff m-0 p-3"><code>{{ incident.diff }}</code></pre>
-    {% else %}
-    <p class="text-muted text-center py-4 mb-0">Diff não disponível para este incidente.</p>
+  <div class="card-body">
+
+    {% if not has_diff %}
+    <p class="text-muted text-center py-3 mb-0">
+      <i class="bi bi-check-circle text-success me-1"></i>
+      Nenhum drift registrado no payload deste incidente.
+    </p>
     {% endif %}
+
+    {# ── Campos Modificados ────────────────────────────────────────────── #}
+    {% if modified %}
+    <h6 class="text-warning mb-2">
+      <i class="bi bi-pencil-square me-1"></i>Campos Modificados
+    </h6>
+    <div class="table-responsive mb-4">
+      <table class="table table-sm table-bordered align-middle small mb-0">
+        <thead class="table-warning text-dark">
+          <tr>
+            <th style="width:30%">Parâmetro</th>
+            <th style="width:35%">Valor Esperado (Baseline)</th>
+            <th style="width:35%">Valor Atual (Capturado)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for param, vals in modified.items() %}
+          <tr>
+            <td class="font-monospace">{{ param }}</td>
+            <td class="text-success font-monospace">
+              {% if vals is mapping %}
+                {{ vals.get('baseline', vals.get('expected', '—')) }}
+              {% else %}
+                {{ vals }}
+              {% endif %}
+            </td>
+            <td class="text-danger font-monospace">
+              {% if vals is mapping %}
+                {{ vals.get('current', vals.get('captured', '—')) }}
+              {% else %}
+                {{ vals }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {# ── Campos Adicionados ────────────────────────────────────────────── #}
+    {% if added %}
+    <h6 class="text-danger mb-2">
+      <i class="bi bi-plus-circle me-1"></i>Adicionados (não previstos na Baseline)
+    </h6>
+    <div class="table-responsive mb-4">
+      <table class="table table-sm table-bordered align-middle small mb-0">
+        <thead class="table-danger">
+          <tr>
+            <th style="width:30%">Parâmetro</th>
+            <th>Valor Atual (Capturado)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for param, val in added.items() %}
+          <tr>
+            <td class="font-monospace">{{ param }}</td>
+            <td class="font-monospace">{{ val }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {# ── Campos Removidos ──────────────────────────────────────────────── #}
+    {% if removed %}
+    <h6 class="text-secondary mb-2">
+      <i class="bi bi-dash-circle me-1"></i>Removidos (presentes na Baseline, ausentes no atual)
+    </h6>
+    <div class="table-responsive mb-4">
+      <table class="table table-sm table-bordered align-middle small mb-0">
+        <thead class="table-secondary">
+          <tr>
+            <th style="width:30%">Parâmetro</th>
+            <th>Valor Esperado (Baseline)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for param, val in removed.items() %}
+          <tr>
+            <td class="font-monospace">{{ param }}</td>
+            <td class="font-monospace">{{ val }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {# ── Auditoria de Firewall ─────────────────────────────────────────── #}
+    {% set fw_sections = [
+        ('position_drift',  'danger',    'shield-x',   'Position Drift (risco de Shadowing)'),
+        ('parameter_drift', 'warning',   'pencil',      'Parameter Drift'),
+        ('missing_rules',   'secondary', 'dash-square', 'Regras Removidas da Baseline'),
+        ('extra_rules',     'primary',   'plus-square', 'Regras Extras não Documentadas'),
+    ] %}
+    {% for key, color, icon, label in fw_sections %}
+      {% set items = fw_audit.get(key, []) %}
+      {% if items %}
+      <h6 class="text-{{ color }} mb-2">
+        <i class="bi bi-{{ icon }} me-1"></i>
+        Firewall — {{ label }}
+        <span class="badge bg-{{ color }} {% if color == 'warning' %}text-dark{% endif %} ms-1">
+          {{ items | length }}
+        </span>
+      </h6>
+      <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle small mb-0">
+          <thead class="table-{{ color }} {% if color == 'warning' %}text-dark{% endif %}">
+            <tr>
+              <th>#</th>
+              <th>Chain</th>
+              <th>Action</th>
+              <th>Protocolo</th>
+              <th>Porta Dst</th>
+              <th>Src</th>
+              <th>Dst</th>
+              <th>Comment</th>
+              {% if key in ('position_drift', 'parameter_drift') %}
+              <th>Parâmetro Alterado</th>
+              <th>Baseline</th>
+              <th>Atual</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in items %}
+            <tr>
+              <td class="text-muted">{{ loop.index }}</td>
+              {% set rule = entry.get('current', entry.get('rule', entry)) %}
+              <td class="font-monospace">{{ rule.get('chain', '—') }}</td>
+              <td class="font-monospace">{{ rule.get('action', '—') }}</td>
+              <td class="font-monospace">{{ rule.get('protocol', '—') }}</td>
+              <td class="font-monospace">{{ rule.get('dst_port', '—') }}</td>
+              <td class="font-monospace small">{{ rule.get('src_address', '—') }}</td>
+              <td class="font-monospace small">{{ rule.get('dst_address', '—') }}</td>
+              <td>{{ rule.get('comment', '—') }}</td>
+              {% if key in ('position_drift', 'parameter_drift') %}
+              <td class="font-monospace">{{ entry.get('field', '—') }}</td>
+              <td class="text-success font-monospace">{{ entry.get('baseline', '—') }}</td>
+              <td class="text-danger font-monospace">{{ entry.get('current_val', entry.get('current', {}).get(entry.get('field',''), '—')) }}</td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    {% endfor %}
+
   </div>
 </div>
 
-<!-- ── Evidência Técnica ───────────────────────────────────────────────── -->
+<!-- ── Evidência Técnica (payload bruto) ──────────────────────────────── -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-white fw-semibold">
-    <i class="bi bi-terminal me-1 text-secondary"></i>Evidência Técnica
+    <i class="bi bi-terminal me-1 text-secondary"></i>Payload Completo (JSON)
   </div>
   <div class="card-body p-0">
-    {% if incident.evidence %}
-    <pre class="m-0 p-3 small bg-light"><code>{{ incident.evidence }}</code></pre>
+    {% if incident.diff_data %}
+    <pre class="m-0 p-3 small bg-light" style="max-height:320px;overflow:auto;"><code>{{ incident.diff_data | tojson(indent=2) }}</code></pre>
     {% else %}
-    <p class="text-muted text-center py-4 mb-0">Sem evidência técnica registrada.</p>
+    <p class="text-muted text-center py-4 mb-0">Sem payload registrado para este incidente.</p>
     {% endif %}
   </div>
 </div>

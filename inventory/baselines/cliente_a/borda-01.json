@@ -1,0 +1,64 @@
+{
+  "hostname": "borda-01",
+  "vendor": "mikrotik",
+  "model": "CCR1036-8G-2S+",
+  "os_version": "7.14",
+  "interfaces": [
+    {
+      "name": "ether1",
+      "interface_type": "ether",
+      "ip_addresses": ["192.168.1.1/24"],
+      "enabled": true,
+      "running": true,
+      "comment": "Uplink ISP"
+    },
+    {
+      "name": "ether2",
+      "interface_type": "ether",
+      "ip_addresses": ["10.0.0.1/30"],
+      "enabled": true,
+      "running": true,
+      "comment": "LAN Core"
+    }
+  ],
+  "routes": [
+    {
+      "destination": "0.0.0.0/0",
+      "gateway": "192.168.1.254",
+      "interface": "ether1",
+      "route_type": "static",
+      "distance": 1
+    },
+    {
+      "destination": "10.10.0.0/16",
+      "gateway": "10.0.0.2",
+      "interface": "ether2",
+      "route_type": "static",
+      "distance": 1
+    }
+  ],
+  "firewall_rules": [
+    {
+      "chain": "input",
+      "action": "accept",
+      "protocol": "tcp",
+      "dst_port": "22",
+      "disabled": false,
+      "comment": "Allow SSH"
+    },
+    {
+      "chain": "input",
+      "action": "accept",
+      "protocol": "icmp",
+      "disabled": false,
+      "comment": "Allow Ping"
+    },
+    {
+      "chain": "input",
+      "action": "drop",
+      "disabled": false,
+      "comment": "Drop All Input"
+    }
+  ],
+  "collected_at": "2026-02-01T00:00:00+00:00"
+}
