@@ -218,26 +218,50 @@ Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricant
 	- Integrar variáveis de ambiente/cofre de segredos
 	- Garantir uso seguro em ambientes multi-cliente
 
+8. [ ] **Task 08: Exposição como MCP Server**
+	- Implementar módulo `mcp/server.py` que envolve as funções de auditoria como *tools* consumíveis pelo protocolo MCP (Model Context Protocol)
+	- Definir schemas de entrada/saída das ferramentas usando Pydantic, garantindo compatibilidade com qualquer orquestrador compatível com MCP (OpenClaw, Claude Desktop, etc.)
+	- Expor endpoint HTTP/SSE para que agentes de IA possam solicitar auditorias em tempo real via chat ou voz
+	- Implementar autenticação por token (Bearer) para proteger o servidor MCP contra acesso não autorizado
+	- Cobrir o servidor com testes unitários e de integração
+	- **Entregável:** `mcp/server.py`, `mcp/tool_schemas.py`, `mcp/__init__.py`
+
+9. [ ] **Task 09: Análise de Desvio Assistida por IA (AI Drift Analysis)**
+	- Criar módulo `ai/drift_analyzer.py` responsável por serializar o diff produzido pelo Diff Engine e enviá-lo a um LLM (OpenAI/OpenClaw) via chamada de API
+	- Definir prompt de sistema especializado em segurança de redes para guiar a interpretação semântica das alterações detectadas
+	- Mapear a severidade retornada pelo modelo para os níveis de criticidade já definidos no projeto (`INFO`, `WARNING`, `CRITICAL`)
+	- Garantir *fallback* gracioso quando a API de IA estiver indisponível, registrando o diff sem análise semântica e continuando o fluxo normal de auditoria
+	- Implementar cache de respostas para evitar chamadas repetidas ao LLM para diffs idênticos
+	- **Entregável:** `ai/drift_analyzer.py`, `ai/prompt_templates.py`, `ai/__init__.py`
+
+10. [ ] **Task 10: Remediação Sugerida por IA**
+	- Criar módulo `ai/remediation.py` que recebe os desvios classificados e solicita ao LLM a geração dos comandos CLI exatos para retornar o dispositivo ao estado da Baseline
+	- Validar os comandos sugeridos contra um conjunto de padrões permitidos (*allowlist*) antes de apresentá-los ao operador, prevenindo execução de comandos destrutivos
+	- Apresentar as sugestões em relatório estruturado (JSON + Markdown), incluindo risco estimado de cada remediação e possível impacto operacional
+	- Integrar o módulo ao fluxo de auditoria existente como etapa opcional, acionável por flag de linha de comando (`--suggest-remediation`)
+	- **Entregável:** `ai/remediation.py`, atualização em `main.py` para suportar a nova flag
+
 ---
-🤖 Integração com IA & OpenClaw.ai (Futuro)
-O projeto está sendo construído com foco em interoperabilidade com agentes de IA. A estrutura de dados em JSON e a validação via Pydantic permitem que o SentinelNet_FLS atue como um provedor de contexto para LLMs através do protocolo MCP (Model Context Protocol) e orquestradores como o OpenClaw.
 
-Plano de Implementação:
-Exposição como MCP Server:
+## 🤖 Integração com IA & OpenClaw.ai (Futuro)
 
-Criar um wrapper para transformar as funções de auditoria em ferramentas (tools) consumíveis por IAs.
+O projeto está sendo construído com foco em interoperabilidade com agentes de IA. A estrutura de dados em JSON e a validação via Pydantic permitem que o SentinelNet_FLS atue como um **provedor de contexto para LLMs** através do protocolo **MCP (Model Context Protocol)** e orquestradores como o **OpenClaw**.
 
-Permitir que agentes solicitem auditorias em tempo real via comandos de voz ou chat.
+### Plano de Implementação
 
-Análise de Desvio Assistida (AI Drift Analysis):
+#### 1. Exposição como MCP Server
+
+Criar um wrapper que transforma as funções de auditoria em ferramentas (*tools*) consumíveis por agentes de IA, permitindo que solicitem auditorias em tempo real via comandos de voz ou chat.
+
+#### 2. Análise de Desvio Assistida (AI Drift Analysis)
 
 Enviar o diferencial (diff) gerado pelo sistema para o OpenClaw para interpretação semântica.
 
-Exemplo: "A IA identifica que a alteração na regra de firewall X abre uma vulnerabilidade para o serviço de banco de dados do cliente."
+> **Exemplo:** *"A IA identifica que a alteração na regra de firewall X abre uma vulnerabilidade para o serviço de banco de dados do cliente."*
 
-Remediação Sugerida:
+#### 3. Remediação Sugerida
 
-Utilizar modelos de linguagem para sugerir os comandos CLI exatos necessários para retornar o equipamento ao estado da Baseline, baseando-se nos desvios detectados.
+Utilizar modelos de linguagem para sugerir os comandos CLI exatos necessários para retornar o equipamento ao estado da Baseline, com base nos desvios detectados.
 
 ## ✅ Critérios de Sucesso (MVP)
 
