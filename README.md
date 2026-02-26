@@ -296,7 +296,7 @@ Objetivo: implementar um dashboard operacional completo para **detectar, prioriz
 3. Persistir eventos em armazenamento consultável (SQLite no MVP) com histórico e trilha de auditoria.
 4. Definir janelas de retenção e rotação para dados operacionais e evidências.
 
-**Entregáveis da Fase 1**
+##### Entregáveis da Fase 1
 
 - Tabela/coleção de eventos operacionais
 - Contrato JSON versionado para eventos e status de remediação
@@ -317,7 +317,7 @@ Objetivo: implementar um dashboard operacional completo para **detectar, prioriz
 4. Incluir rate limit e autenticação por token para integração segura.
 5. Estruturar backend em Flask com Blueprints separados por domínio (health, devices, incidents, remediation, auth).
 
-**Entregáveis da Fase 2**
+##### Entregáveis da Fase 2
 
 - API REST documentada para consumo do dashboard
 - Fluxo de aprovação de remediação com auditoria
@@ -339,7 +339,7 @@ Objetivo: implementar um dashboard operacional completo para **detectar, prioriz
 4. Implementar fila de remediação com estados: `novo`, `em análise`, `aprovado`, `executado`, `falhou`, `revertido`.
 5. Implementar frontend inicial com templates server-side (Jinja2) para acelerar o MVP.
 
-**Entregáveis da Fase 3**
+##### Entregáveis da Fase 3
 
 - Interface web funcional para NOC/SOC
 - Navegação por cliente e ativo com drill-down
@@ -353,7 +353,7 @@ Objetivo: implementar um dashboard operacional completo para **detectar, prioriz
 4. Executar remediação em janela controlada com rollback pré-definido.
 5. Recoletar snapshot após execução para confirmar convergência com a baseline.
 
-**Entregáveis da Fase 4**
+##### Entregáveis da Fase 4
 
 - Pipeline de remediação com validação e rollback
 - Evidência automática de sucesso/falha pós-ação
@@ -369,7 +369,7 @@ Objetivo: implementar um dashboard operacional completo para **detectar, prioriz
 3. Implementar relatórios executivos e técnicos por período e por cliente.
 4. Estabelecer processo de revisão pós-incidente (RCA) para redução de recorrência.
 
-**Entregáveis da Fase 5**
+##### Entregáveis da Fase 5
 
 - Matriz de alertas por severidade e canal
 - Painel de SLO com tendências

@@ -23,7 +23,7 @@
   </div>
   <div class="col-sm-2">
     <label class="form-label small text-muted mb-1">Severidade</label>
-    <select name="severity" class="form-select form-select-sm">
+    <select name="severity" class="form-select form-select-sm" title="Filtrar por Severidade">
       <option value="">Todas</option>
       <option value="CRITICAL" {% if filters.severity == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
       <option value="WARNING"  {% if filters.severity == 'WARNING'  %}selected{% endif %}>WARNING</option>
@@ -32,7 +32,7 @@
   </div>
   <div class="col-sm-2">
     <label class="form-label small text-muted mb-1">Status</label>
-    <select name="status" class="form-select form-select-sm">
+    <select name="status" class="form-select form-select-sm" title="Filtrar por Status">
       <option value="">Todos</option>
       <option value="novo"        {% if filters.status == 'novo'        %}selected{% endif %}>Novo</option>
       <option value="em_analise"  {% if filters.status == 'em_analise'  %}selected{% endif %}>Em análise</option>
@@ -88,7 +88,8 @@
         <td class="text-muted">{{ inc.detected_at }}</td>
         <td>
           <a href="{{ url_for('incidents.get_incident', incident_id=inc.id) }}"
-             class="btn btn-sm btn-outline-primary">
+             class="btn btn-sm btn-outline-primary"
+             title="Visualizar incidente">
             <i class="bi bi-eye"></i>
           </a>
         </td>
@@ -102,15 +103,11 @@
 <nav>
   <ul class="pagination pagination-sm justify-content-end">
     {% if page > 1 %}
-    <li class="page-item">
-      <a class="page-link" href="?page={{ page - 1 }}">Anterior</a>
-    </li>
+    <li class="page-item"><a class="page-link" href="?page={{ page - 1 }}">Anterior</a></li>
     {% endif %}
     <li class="page-item active"><span class="page-link">{{ page }}</span></li>
     {% if incidents|length == 25 %}
-    <li class="page-item">
-      <a class="page-link" href="?page={{ page + 1 }}">Próxima</a>
-    </li>
+    <li class="page-item"><a class="page-link" href="?page={{ page + 1 }}">Próxima</a></li>
     {% endif %}
   </ul>
 </nav>

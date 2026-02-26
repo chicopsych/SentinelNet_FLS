@@ -32,6 +32,7 @@
         type="button"
         data-bs-toggle="collapse"
         data-bs-target="#navMenu"
+        aria-label="Toggle navigation"
       >
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -72,7 +73,7 @@
         {% for category, message in messages %}
           <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
             {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar" title="Fechar"></button>
           </div>
         {% endfor %}
       {% endif %}
