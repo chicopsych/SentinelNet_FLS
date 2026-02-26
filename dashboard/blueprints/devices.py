@@ -15,6 +15,13 @@ from flask import Blueprint, flash, jsonify, render_template, request
 
 from dashboard.common.constants import SEVERITY_STATUS
 from dashboard.common.http import wants_json
+from dashboard.repositories.credentials_repository import save_device_credentials
+from dashboard.repositories.devices_repository import (
+    create_inventory_device,
+    delete_inventory_device,
+    ensure_inventory_table,
+    list_inventory_devices,
+)
 from dashboard.repositories.incidents_repository import list_open_summary_by_device
 from inventory.customer.customer import DEVICE_INVENTORY
 from dashboard.services.discovery import DiscoveryError, run_nmap_discovery
@@ -54,7 +61,24 @@ def _list_devices(
     incidents = _incidents_by_device()
     devices: list[dict] = []
 
+    ensure_inventory_table()
+    persisted_entries = list_inventory_devices()
+
+    combined: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str]] = set()
+
     for entry in DEVICE_INVENTORY:
+        key = (entry.get("customer_id", ""), entry.get("device_id", ""))
+        seen_keys.add(key)
+        combined.append(entry)
+
+    for entry in persisted_entries:
+        key = (entry.get("customer_id", ""), entry.get("device_id", ""))
+        if key in seen_keys:
+            continue
+        combined.append(entry)
+
+    for entry in combined:
         if customer and entry.get("customer_id", "").lower() != customer.lower():
             continue
         if vendor and entry.get("vendor", "").lower() != vendor.lower():
@@ -74,6 +98,13 @@ def _list_devices(
         })
 
     return devices
+
+
+def _parse_port(value: str, default: int = 22) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _get_device(device_id: str) -> dict | None:
@@ -152,6 +183,74 @@ def discover_devices():
         network=network,
         discovery=discovery,
     )
+
+
+@devices_bp.route("/onboard", methods=["GET", "POST"])
+def onboard_device():
+    """Cadastro manual de dispositivo com persistência no SQLite."""
+    form_data = {
+        "customer": request.values.get("customer", ""),
+        "device": request.values.get("device", ""),
+        "vendor": request.values.get("vendor", ""),
+        "host": request.values.get("host", ""),
+        "porta": request.values.get("porta", "22"),
+        "username": request.values.get("username", ""),
+        "token": request.values.get("token", ""),
+    }
+
+    if request.method == "POST":
+        customer = form_data["customer"].strip()
+        device = form_data["device"].strip()
+        vendor = form_data["vendor"].strip()
+        host = form_data["host"].strip()
+        port = _parse_port(form_data["porta"], default=-1)
+        username = form_data["username"].strip()
+        password = request.form.get("password", "")
+        token = form_data["token"].strip() or None
+
+        ok, message = create_inventory_device(
+            customer_id=customer,
+            device_id=device,
+            vendor=vendor,
+            host=host,
+            port=port,
+        )
+        if ok:
+            cred_ok, cred_msg = save_device_credentials(
+                customer_id=customer,
+                device_id=device,
+                host=host,
+                username=username,
+                password=password,
+                port=port,
+                token=token,
+            )
+
+            if not cred_ok:
+                delete_inventory_device(customer_id=customer, device_id=device)
+                flash(f"{cred_msg} Cadastro do dispositivo revertido.", "danger")
+            else:
+                flash(message, "success")
+                flash(cred_msg, "info")
+                return render_template(
+                    "devices_onboard.html",
+                    form={
+                        "customer": "",
+                        "device": "",
+                        "vendor": "",
+                        "host": "",
+                        "porta": "22",
+                        "username": "",
+                        "token": "",
+                    },
+                )
+
+        flash(message, "danger")
+
+    if wants_json(request):
+        return jsonify({"message": "Use POST para cadastrar dispositivo.", "form": form_data})
+
+    return render_template("devices_onboard.html", form=form_data)
 
 
 @devices_bp.get("/<device_id>")

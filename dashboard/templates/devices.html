@@ -10,9 +10,14 @@
     <span class="badge bg-secondary ms-2">{{ total }}</span>
   </h1>
 
-  <a href="{{ url_for('devices.discover_devices') }}" class="btn btn-sm btn-outline-success">
-    <i class="bi bi-radar me-1"></i>Discovery via Nmap
-  </a>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('devices.onboard_device') }}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>Novo Dispositivo
+    </a>
+    <a href="{{ url_for('devices.discover_devices') }}" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-radar me-1"></i>Discovery via Nmap
+    </a>
+  </div>
 
   <!-- Filtros -->
   <form method="get" class="d-flex gap-2 flex-wrap">

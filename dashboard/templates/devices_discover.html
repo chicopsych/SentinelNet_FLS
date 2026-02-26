@@ -65,6 +65,7 @@
               <th>Hostname</th>
               <th>MAC</th>
               <th>Vendor</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -85,16 +86,22 @@
               <td>{{ host.hostname or '—' }}</td>
               <td>{{ host.mac or '—' }}</td>
               <td>{{ host.vendor or '—' }}</td>
+              <td class="text-end">
+                <a
+                  href="{{ url_for('devices.onboard_device') }}?vendor={{ (host.vendor or '') | lower }}&host={{ host.ip }}"
+                  class="btn btn-sm btn-outline-primary"
+                >
+                  <i class="bi bi-plus-circle me-1"></i>Cadastrar
+                </a>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
-    <div class="card-footer bg-white d-flex justify-content-end">
-      <button type="button" class="btn btn-outline-primary" disabled>
-        <i class="bi bi-plus-circle me-1"></i>Cadastrar selecionados (próxima task)
-      </button>
+    <div class="card-footer bg-white text-muted small">
+      Dica: use o botão <strong>Cadastrar</strong> em cada host para abrir o onboarding com host/vendor pré-preenchidos.
     </div>
   </form>
   {% endif %}

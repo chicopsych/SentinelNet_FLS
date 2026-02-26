@@ -235,6 +235,53 @@ class VaultManager:
         customer_data = vault_data.get(customer_id, {})
         return list(customer_data.keys())
 
+    def load_payload(self) -> dict[str, Any]:
+        """
+        Retorna todo o conteúdo descriptografado do cofre.
+
+        Se o cofre ainda não existir, retorna ``{}`` para facilitar bootstrap
+        de novos cadastros via dashboard/CLI.
+        """
+        if not self.vault_exists():
+            return {}
+        return self._decrypt_vault()
+
+    def upsert_credentials(
+        self,
+        *,
+        customer_id: str,
+        device_id: str,
+        host: str,
+        username: str,
+        password: str,
+        port: int,
+        token: str | None = None,
+    ) -> None:
+        """
+        Cria/atualiza credenciais de um dispositivo no cofre criptografado.
+
+        Nunca registra senha/token em logs.
+        """
+        payload = self.load_payload()
+        payload.setdefault(customer_id, {})
+
+        data: dict[str, Any] = {
+            "host": host,
+            "username": username,
+            "password": password,
+            "port": port,
+        }
+        if token:
+            data["token"] = token
+
+        payload[customer_id][device_id] = data
+        self.encrypt_payload(payload)
+        logger.info(
+            "Credenciais atualizadas no cofre: customer='%s', device='%s'.",
+            customer_id,
+            device_id,
+        )
+
     def vault_exists(self) -> bool:
         """Verifica se o arquivo do cofre existe em disco."""
         return self._vault_path.is_file()

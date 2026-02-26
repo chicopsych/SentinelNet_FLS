@@ -245,6 +245,8 @@ SentinelNet_FLS/
 │   │   └── http.py
 │   ├── repositories/          # Camada de acesso a dados por domínio
 │   │   ├── __init__.py
+│   │   ├── credentials_repository.py
+│   │   ├── devices_repository.py
 │   │   └── incidents_repository.py
 │   ├── templates/              # Templates Jinja2
 │   │   ├── base.html           # Layout base (Bootstrap 5)
@@ -319,6 +321,7 @@ python run.py
 - `GET /health/stream` → Server-Sent Events (atualização em tempo real)
 - `GET /devices/` e `GET /devices/<device_id>`
 - `GET /devices/discover` e `POST /devices/discover` → discovery de ativos por faixa CIDR (nmap)
+- `GET /devices/onboard` e `POST /devices/onboard` → cadastro manual de ativo com persistência no SQLite
 - `GET /incidents/` e `GET /incidents/<incident_id>`
 - `GET /auth/verify` (protegido por token)
 - `POST /incidents/<incident_id>/remediation/ui/suggest` (UI)
@@ -404,15 +407,15 @@ As tasks abaixo foram adicionadas para manter o desenvolvimento aderente ao plan
    - ✅ Execução de `nmap` no backend com parser XML estruturado
    - ✅ Exibição de ativos encontrados com seleção para cadastro (handoff para Task A2)
 
-2. [ ] **Task A2: Cadastro de Dispositivo via Dashboard**
-   - Criar formulário de onboarding (`customer`, `device`, `vendor`, `host`, `porta`)
-   - Validar campos obrigatórios e evitar duplicidade de dispositivo
-   - Persistir metadados do ativo no SQLite
+2. [x] **Task A2: Cadastro de Dispositivo via Dashboard**
+   - ✅ Formulário de onboarding implementado (`customer`, `device`, `vendor`, `host`, `porta`) em `/devices/onboard`
+   - ✅ Validação de campos obrigatórios e prevenção de duplicidade (`customer+device` e `host+porta`)
+   - ✅ Persistência de metadados do ativo no SQLite (`inventory_devices`)
 
-3. [ ] **Task A3: Cadastro Seguro de Credenciais (UI → Vault)**
-   - Integrar formulário do dashboard ao `VaultManager`
-   - Gravar credenciais apenas no `inventory/vault.enc`
-   - Garantir que logs nunca incluam senha/token
+3. [x] **Task A3: Cadastro Seguro de Credenciais (UI → Vault)**
+   - ✅ Formulário do dashboard integrado ao `VaultManager` no fluxo `/devices/onboard`
+   - ✅ Credenciais gravadas exclusivamente no cofre criptografado `inventory/vault.enc`
+   - ✅ Logging sem exposição de segredo (senha/token não são registrados)
 
 4. [ ] **Task A4: Inventário Dinâmico no Lugar do Estático**
    - Substituir uso de `DEVICE_INVENTORY` estático por consulta ao banco

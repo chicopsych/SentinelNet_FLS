@@ -12,7 +12,10 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request
 
 from dashboard.common.http import wants_json
-from dashboard.repositories.incidents_repository import get_incident, list_incidents
+from dashboard.repositories.incidents_repository import (
+    get_incident as repo_get_incident,
+    list_incidents as repo_list_incidents,
+)
 
 incidents_bp = Blueprint("incidents", __name__)
 
@@ -31,7 +34,7 @@ def list_incidents():
     status   = request.args.get("status")
     page     = max(1, int(request.args.get("page", 1)))
 
-    incidents, total = list_incidents(
+    incidents, total = repo_list_incidents(
         customer=customer,
         severity=severity,
         status=status,
@@ -53,7 +56,7 @@ def list_incidents():
 @incidents_bp.get("/<int:incident_id>")
 def get_incident(incident_id: int):
     """Detalhe do incidente: diff estruturado, metadados e severidade."""
-    incident = get_incident(incident_id)
+    incident = repo_get_incident(incident_id)
 
     if incident is None:
         if wants_json(request):
