@@ -57,6 +57,10 @@ main {
   letter-spacing: 0.04em;
 }
 
+.discover-select-col {
+  width: 52px;
+}
+
 /* ── Badges de Severidade ───────────────────────────────────────────────── */
 .badge {
   font-weight: 600;

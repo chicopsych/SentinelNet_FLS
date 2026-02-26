@@ -3,29 +3,42 @@
 {% block title %}Overview — SentinelNet{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <h1 class="h4 mb-0">
-    <i class="bi bi-speedometer2 me-2 text-warning"></i>Visão Geral do Ambiente
+    <i class="bi bi-speedometer2 me-2 text-warning"></i>Visao Geral do Ambiente
   </h1>
-  <a href="{{ url_for('health.overview') }}" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-arrow-clockwise me-1"></i>Atualizar
-  </a>
+  <div class="d-flex align-items-center gap-3">
+    <span id="stream-status" class="badge bg-secondary">
+      <i class="bi bi-circle-fill me-1" style="font-size:.55rem"></i>conectando...
+    </span>
+    <div class="d-flex align-items-center gap-1 small text-muted">
+      <label for="interval-select" class="mb-0">Intervalo:</label>
+      <select id="interval-select" class="form-select form-select-sm" style="width:auto">
+        <option value="10">10s</option>
+        <option value="30" selected>30s</option>
+        <option value="60">1min</option>
+        <option value="300">5min</option>
+      </select>
+    </div>
+    <span id="last-updated" class="small text-muted">--:--:--</span>
+  </div>
 </div>
 
-<!-- ── KPI Cards ─────────────────────────────────────────────────────────── -->
+<!-- KPI Cards -->
 <div class="row g-3 mb-4">
 
   <div class="col-sm-6 col-xl-3">
     <div class="card border-0 shadow-sm h-100">
       <div class="card-body">
         <p class="text-muted small mb-1"><i class="bi bi-router me-1"></i>Dispositivos</p>
-        <h2 class="fw-bold text-dark">{{ overview.devices.total }}</h2>
+        <h2 id="kpi-devices-total" class="fw-bold text-dark">{{ overview.devices.total }}</h2>
         <div class="d-flex gap-3 mt-2 small">
           <span class="text-success">
-            <i class="bi bi-check-circle-fill me-1"></i>{{ overview.devices.healthy }} saudáveis
+            <i class="bi bi-check-circle-fill me-1"></i><span id="kpi-devices-healthy">{{ overview.devices.healthy }}</span> saudaveis
           </span>
           <span class="text-danger">
-            <i class="bi bi-x-circle-fill me-1"></i>{{ overview.devices.with_incident }} c/ incidente
+            <i class="bi bi-x-circle-fill me-1"></i><span id="kpi-devices-incident">{{ overview.devices.with_incident }}</span> c/ incidente
           </span>
         </div>
       </div>
@@ -36,11 +49,12 @@
     <div class="card border-0 shadow-sm h-100">
       <div class="card-body">
         <p class="text-muted small mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Incidentes Abertos</p>
-        <h2 class="fw-bold text-dark">{{ overview.incidents.open }}</h2>
-        <div class="d-flex gap-3 mt-2 small">
-          <span class="badge bg-danger">{{ overview.incidents.critical }} CRITICAL</span>
-          <span class="badge bg-warning text-dark">{{ overview.incidents.warning }} WARNING</span>
-          <span class="badge bg-info text-dark">{{ overview.incidents.info }} INFO</span>
+        <h2 id="kpi-inc-open" class="fw-bold text-dark">{{ overview.incidents.open }}</h2>
+        <div class="d-flex flex-wrap gap-1 mt-2">
+          <span class="badge bg-danger"><span id="kpi-inc-critical">{{ overview.incidents.critical }}</span> CRITICAL</span>
+          <span class="badge bg-warning text-dark"><span id="kpi-inc-high">{{ overview.incidents.high }}</span> HIGH</span>
+          <span class="badge bg-info text-dark"><span id="kpi-inc-warning">{{ overview.incidents.warning }}</span> WARNING</span>
+          <span class="badge bg-light text-dark border"><span id="kpi-inc-info">{{ overview.incidents.info }}</span> INFO</span>
         </div>
       </div>
     </div>
@@ -49,11 +63,11 @@
   <div class="col-sm-6 col-xl-3">
     <div class="card border-0 shadow-sm h-100">
       <div class="card-body">
-        <p class="text-muted small mb-1"><i class="bi bi-wrench me-1"></i>Remediações</p>
-        <h2 class="fw-bold text-dark">{{ overview.remediation.pending_approval }}</h2>
-        <p class="text-muted small mt-2 mb-0">aguardando aprovação</p>
+        <p class="text-muted small mb-1"><i class="bi bi-wrench me-1"></i>Remediacoes</p>
+        <h2 id="kpi-remed-pending" class="fw-bold text-dark">{{ overview.remediation.pending_approval }}</h2>
+        <p class="text-muted small mt-2 mb-0">aguardando aprovacao</p>
         <p class="text-success small mb-0">
-          {{ overview.remediation.executed_today }} executadas hoje
+          <span id="kpi-remed-executed">{{ overview.remediation.executed_today }}</span> executadas hoje
         </p>
       </div>
     </div>
@@ -65,14 +79,14 @@
         <p class="text-muted small mb-1"><i class="bi bi-clock-history me-1"></i>SLO</p>
         <div class="row text-center mt-2">
           <div class="col-6">
-            <p class="fw-bold fs-5 mb-0 text-primary">
-              {{ overview.slo.mtta_minutes if overview.slo.mtta_minutes is not none else '—' }}
+            <p id="kpi-mtta" class="fw-bold fs-5 mb-0 text-primary">
+              {{ overview.slo.mtta_minutes if overview.slo.mtta_minutes is not none else '--' }}
             </p>
             <p class="text-muted small mb-0">MTTA (min)</p>
           </div>
           <div class="col-6">
-            <p class="fw-bold fs-5 mb-0 text-primary">
-              {{ overview.slo.mttr_minutes if overview.slo.mttr_minutes is not none else '—' }}
+            <p id="kpi-mttr" class="fw-bold fs-5 mb-0 text-primary">
+              {{ overview.slo.mttr_minutes if overview.slo.mttr_minutes is not none else '--' }}
             </p>
             <p class="text-muted small mb-0">MTTR (min)</p>
           </div>
@@ -83,33 +97,179 @@
 
 </div>
 
-<!-- ── Links Rápidos ───────────────────────────────────────────────────── -->
-<div class="row g-3">
-  <div class="col-md-6">
+<!-- Incidentes Recentes -->
+<div class="row g-3 mb-4">
+  <div class="col-12">
     <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white fw-semibold">
-        <i class="bi bi-exclamation-circle me-1 text-danger"></i>Incidentes Recentes
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-circle me-1 text-danger"></i>Incidentes Recentes</span>
+        <a href="{{ url_for('incidents.list_incidents') }}" class="btn btn-sm btn-outline-primary">Ver todos</a>
       </div>
-      <div class="card-body text-center text-muted py-5">
-        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-        <p class="mb-2">Nenhum incidente registrado ainda.</p>
-        <a href="{{ url_for('incidents.list_incidents') }}" class="btn btn-sm btn-outline-primary">
-          Ver todos os incidentes
-        </a>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6">
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white fw-semibold">
-        <i class="bi bi-wrench me-1 text-warning"></i>Fila de Remediação
-      </div>
-      <div class="card-body text-center text-muted py-5">
-        <i class="bi bi-check2-all fs-1 d-block mb-2"></i>
-        <p class="mb-0">Nenhuma remediação pendente.</p>
+      <div class="card-body p-0">
+        <div id="recent-incidents-empty" class="text-center text-muted py-5 {% if overview.recent_incidents %}d-none{% endif %}">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          <p class="mb-0">Nenhum incidente aberto.</p>
+        </div>
+        <div class="table-responsive {% if not overview.recent_incidents %}d-none{% endif %}" id="recent-incidents-table-wrap">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>#</th><th>Dispositivo</th><th>Cliente</th>
+                <th>Severidade</th><th>Categoria</th><th>Detectado em</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="recent-incidents-tbody">
+              {% for inc in overview.recent_incidents %}
+              <tr>
+                <td><a href="{{ url_for('incidents.get_incident', incident_id=inc.id) }}">#{{ inc.id }}</a></td>
+                <td>{{ inc.device_id }}</td>
+                <td>{{ inc.customer_id }}</td>
+                <td>
+                  {% if inc.severity | upper == 'CRITICAL' %}<span class="badge bg-danger">CRITICAL</span>
+                  {% elif inc.severity | upper == 'HIGH' %}<span class="badge bg-warning text-dark">HIGH</span>
+                  {% elif inc.severity | upper == 'WARNING' %}<span class="badge bg-info text-dark">WARNING</span>
+                  {% else %}<span class="badge bg-light text-dark border">{{ inc.severity }}</span>{% endif %}
+                </td>
+                <td>{{ inc.category }}</td>
+                <td>{{ inc.timestamp }}</td>
+                <td><span class="badge bg-secondary">{{ inc.status }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+
+  const SEV_BADGE = {
+    CRITICAL: '<span class="badge bg-danger">CRITICAL</span>',
+    HIGH:     '<span class="badge bg-warning text-dark">HIGH</span>',
+    WARNING:  '<span class="badge bg-info text-dark">WARNING</span>',
+  };
+
+  let evtSource = null;
+  let pollTimer = null;
+  let currentInterval = parseInt(
+    localStorage.getItem("sentinel_sse_interval") || "30", 10
+  );
+
+  const sel         = document.getElementById("interval-select");
+  const statusBadge = document.getElementById("stream-status");
+  const lastUpdEl   = document.getElementById("last-updated");
+
+  if (sel) {
+    sel.value = String(currentInterval);
+    sel.addEventListener("change", () => {
+      currentInterval = parseInt(sel.value, 10);
+      localStorage.setItem("sentinel_sse_interval", sel.value);
+      stopAll();
+      startSSE();
+    });
+  }
+
+  function startSSE() {
+    if (!window.EventSource) { startPolling(); return; }
+    evtSource = new EventSource("/health/stream?interval=" + currentInterval);
+    evtSource.onopen = () => setStatus("success", "ao vivo");
+    evtSource.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data && data.devices) applyData(data);
+      } catch (_) {}
+    };
+    evtSource.onerror = () => {
+      setStatus("warning", "reconectando...");
+      evtSource.close();
+      evtSource = null;
+      setTimeout(startPolling, 5000);
+    };
+  }
+
+  function startPolling() {
+    if (evtSource) return;
+    setStatus("secondary", "polling");
+    fetchNow();
+    pollTimer = setInterval(fetchNow, currentInterval * 1000);
+  }
+
+  function fetchNow() {
+    fetch("/health/api/overview")
+      .then((r) => r.json())
+      .then((data) => { applyData(data); setStatus("secondary", "polling"); })
+      .catch(() => setStatus("danger", "erro"));
+  }
+
+  function stopAll() {
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  function applyData(d) {
+    set("kpi-devices-total",    d.devices.total);
+    set("kpi-devices-healthy",  d.devices.healthy);
+    set("kpi-devices-incident", d.devices.with_incident);
+    set("kpi-inc-open",         d.incidents.open);
+    set("kpi-inc-critical",     d.incidents.critical);
+    set("kpi-inc-high",         d.incidents.high);
+    set("kpi-inc-warning",      d.incidents.warning);
+    set("kpi-inc-info",         d.incidents.info);
+    set("kpi-remed-pending",    d.remediation.pending_approval);
+    set("kpi-remed-executed",   d.remediation.executed_today);
+    set("kpi-mtta", d.slo.mtta_minutes != null ? d.slo.mtta_minutes : "--");
+    set("kpi-mttr", d.slo.mttr_minutes != null ? d.slo.mttr_minutes : "--");
+    updateRecentTable(d.recent_incidents || []);
+    lastUpdEl.textContent = new Date().toLocaleTimeString("pt-BR");
+  }
+
+  function set(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function updateRecentTable(rows) {
+    const tbody = document.getElementById("recent-incidents-tbody");
+    const empty = document.getElementById("recent-incidents-empty");
+    const wrap  = document.getElementById("recent-incidents-table-wrap");
+    if (!tbody) return;
+    if (!rows.length) {
+      empty && empty.classList.remove("d-none");
+      wrap  && wrap.classList.add("d-none");
+      return;
+    }
+    empty && empty.classList.add("d-none");
+    wrap  && wrap.classList.remove("d-none");
+    tbody.innerHTML = rows.map((inc) => {
+      const sev = (inc.severity || "").toUpperCase();
+      const badge = SEV_BADGE[sev] ||
+        '<span class="badge bg-light text-dark border">' + inc.severity + "</span>";
+      const ts = (inc.timestamp || "--").replace("T", " ").slice(0, 19);
+      return "<tr>" +
+        "<td><a href='/incidents/" + inc.id + "'>#" + inc.id + "</a></td>" +
+        "<td>" + (inc.device_id   || "--") + "</td>" +
+        "<td>" + (inc.customer_id || "--") + "</td>" +
+        "<td>" + badge + "</td>" +
+        "<td>" + (inc.category || "--") + "</td>" +
+        "<td>" + ts + "</td>" +
+        "<td><span class='badge bg-secondary'>" + (inc.status || "--") + "</span></td>" +
+        "</tr>";
+    }).join("");
+  }
+
+  function setStatus(color, text) {
+    statusBadge.className = "badge bg-" + color;
+    statusBadge.innerHTML =
+      '<i class="bi bi-circle-fill me-1" style="font-size:.55rem"></i>' + text;
+  }
+
+  startSSE();
+})();
+</script>
 {% endblock %}

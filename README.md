@@ -22,15 +22,15 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 
 - **Maturidade atual:** MVP técnico funcional (CLI + Dashboard Flask inicial)
 - **Coleta de dados de rede:** implementada para MikroTik
-- **Detecção de drift:** implementada e demonstrada via fluxo de exemplo no `main.py`
+- **Detecção de drift:** implementada e integrada ao loop de auditoria em lote no `main.py`
 - **Relatórios de auditoria:** persistência em JSON, HTML e SQLite implementada
-- **Dashboard Flask:** estrutura base pronta (app factory, blueprints e templates)
-- **Próximo marco principal:** integrar pipeline real inventário → driver → diff → incidentes para abastecer o dashboard com dados de produção
+- **Dashboard Flask:** APIs e telas principais já conectadas ao SQLite (`health`, `devices`, `incidents`)
+- **Próximo marco principal:** onboarding completo de ativos pelo dashboard (discovery + cadastro seguro de credenciais + baseline)
 
 ### Semáforo de andamento
 
 - 🟢 **Concluído:** schema, driver base, diff engine, report manager, cofre de credenciais, esqueleto Flask
-- 🟡 **Em progresso:** integração ponta a ponta do fluxo de auditoria com dados reais no dashboard
+- 🟡 **Em progresso:** onboarding operacional via dashboard (discovery de ativos, cadastro e gestão de inventário)
 - 🔴 **Não iniciado:** MCP Server, análise IA de drift, remediação IA com execução controlada
 
 ### 📈 Progresso percentual por Task (estimativa)
@@ -39,8 +39,8 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 | --- | --- | --- | ---: |
 | 01 | Schema JSON (Pydantic) | ✅ Concluído | 100% |
 | 02 | Driver Base Abstrato | ✅ Concluído | 100% |
-| 03 | Driver MikroTik (MVP) | 🟡 Parcial | 80% |
-| 04 | Parsing TTP (MVP) | 🟡 Parcial | 60% |
+| 03 | Driver MikroTik (MVP) | 🟡 Parcial | 95% |
+| 04 | Parsing TTP (MVP) | 🟡 Parcial | 65% |
 | 05 | Diff Engine | ✅ Concluído | 100% |
 | 06 | Relatório + Logging | ✅ Concluído | 100% |
 | 07 | Gestão de Credenciais | ✅ Concluído | 100% |
@@ -48,19 +48,19 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 | 09 | AI Drift Analysis | 🔴 Não iniciado | 0% |
 | 10 | Remediação por IA | 🔴 Não iniciado | 0% |
 
-## Progresso geral do roadmap (10 tasks): ~64%
+## Progresso geral do roadmap (10 tasks): ~66%
 
 ### 📈 Progresso percentual por Fase do Dashboard (estimativa)
 
 | Fase | Escopo | Status | Progresso |
 | --- | --- | --- | ---: |
-| Fase 1 | Fundamentos de dados e telemetria | 🟡 Parcial | 55% |
-| Fase 2 | API de observabilidade (Flask) | 🟡 Parcial | 45% |
-| Fase 3 | Dashboard web em Flask | 🟡 Parcial | 40% |
+| Fase 1 | Fundamentos de dados e telemetria | 🟡 Parcial | 65% |
+| Fase 2 | API de observabilidade (Flask) | 🟡 Parcial | 70% |
+| Fase 3 | Dashboard web em Flask | 🟡 Parcial | 68% |
 | Fase 4 | Motor de correção segura | 🔴 Não iniciado | 0% |
 | Fase 5 | Alertas, SLOs e governança | 🔴 Não iniciado | 0% |
 
-### Progresso geral do dashboard (5 fases): ~28%
+### Progresso geral do dashboard (5 fases): ~41%
 
 ---
 
@@ -126,6 +126,17 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
   - Blueprints de `auth`, `health`, `devices`, `incidents`, `remediation`
   - Templates base com Bootstrap 5 + páginas de overview/incidentes
   - Rota raiz `/` redirecionando para `/health/overview`
+  - Overview em tempo real com SSE (`/health/stream`) e fallback por polling (`/health/api/overview`)
+  - Rotas de `incidents` e `devices` conectadas ao SQLite real (`inventory/sentinel_data.db`)
+
+- **Incident Engine (`core/incident_engine.py`)**
+  - Tabela `incidents` criada automaticamente no SQLite
+  - Persistência de incidentes com `payload_json`
+  - Pronto para alimentar dashboard e histórico operacional
+
+- **Stress Test (`stress_test.py`)**
+  - Geração de incidentes simulados realistas para validar dashboard e consultas
+  - Cenários para drift escalar e auditoria de firewall
 
 ---
 
@@ -282,12 +293,15 @@ python run.py
 
 ### Endpoints disponíveis no Dashboard Flask (estado atual)
 
-> Alguns endpoints ainda retornam dados mockados (estrutura pronta para integração com repositório real de incidentes).
+> `health`, `devices` e `incidents` já operam com dados reais do SQLite; remediação ainda está em estágio inicial/controlado.
 
 - `GET /` → redireciona para overview
 - `GET /health/ping` → healthcheck simples
 - `GET /health/overview` → overview (HTML/JSON)
+- `GET /health/api/overview` → endpoint JSON para polling
+- `GET /health/stream` → Server-Sent Events (atualização em tempo real)
 - `GET /devices/` e `GET /devices/<device_id>`
+- `GET /devices/discover` e `POST /devices/discover` → discovery de ativos por faixa CIDR (nmap)
 - `GET /incidents/` e `GET /incidents/<incident_id>`
 - `GET /auth/verify` (protegido por token)
 - `POST /incidents/<incident_id>/remediation/suggest` (token)
@@ -322,7 +336,8 @@ Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricant
 3. [~] **Task 03: Desenvolvimento do Driver MikroTik (MVP)**
    - ✅ Conexão Netmiko e coleta `/export verbose`
    - ✅ Parse de cabeçalho e montagem de `DeviceConfig`
-   - ⏳ Falta integração completa com pipeline de inventário real no `main.py`
+   - ✅ Integrado ao loop de auditoria em lote no `main.py`
+   - ⏳ Pendente: ampliar cobertura para cenários de firmware/saída heterogênea
 
 4. [~] **Task 04: Criação dos Templates de Parsing (TTP)**
    - ✅ Cobertura inicial para rotas e firewall
@@ -352,11 +367,57 @@ Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricant
 
 ### Próximas prioridades recomendadas (curto prazo)
 
-1. Integrar fluxo real `inventário → driver → diff → report` no `main.py` (sem dados mock).
-2. Criar `IncidentEngine` para transformar drifts em incidentes consumíveis pelo dashboard.
-3. Conectar endpoints Flask (`/devices`, `/incidents`) ao histórico SQLite.
-4. Adicionar autenticação por token estático em produção e política de rotação.
-5. Incluir testes automatizados de regressão para diff/report/vault.
+1. Implementar discovery de ativos via `nmap` no dashboard (`/devices/discover`) com execução controlada no backend.
+2. Implementar cadastro de dispositivo + credenciais pelo dashboard, persistindo segredos no `VaultManager`.
+3. Migrar de inventário estático (`DEVICE_INVENTORY`) para inventário dinâmico em SQLite com telas de gestão.
+4. Conectar baseline por cliente/dispositivo no fluxo de onboarding e auditoria recorrente.
+5. Incluir testes automatizados de regressão para `diff`, `incident_engine`, `vault` e rotas Flask.
+
+---
+
+## 🧭 Alinhamento com o Contexto do Chat (`conversa-com-ia.txt`)
+
+As tasks abaixo foram adicionadas para manter o desenvolvimento aderente ao planejamento discutido no chat (foco em operação comercial, dashboard e onboarding seguro de clientes).
+
+1. [x] **Task A1: Discovery de Ativos via Nmap (Dashboard)**
+   - ✅ Fluxo de descoberta por faixa CIDR implementado no dashboard (`/devices/discover`)
+   - ✅ Execução de `nmap` no backend com parser XML estruturado
+   - ✅ Exibição de ativos encontrados com seleção para cadastro (handoff para Task A2)
+
+2. [ ] **Task A2: Cadastro de Dispositivo via Dashboard**
+   - Criar formulário de onboarding (`customer`, `device`, `vendor`, `host`, `porta`)
+   - Validar campos obrigatórios e evitar duplicidade de dispositivo
+   - Persistir metadados do ativo no SQLite
+
+3. [ ] **Task A3: Cadastro Seguro de Credenciais (UI → Vault)**
+   - Integrar formulário do dashboard ao `VaultManager`
+   - Gravar credenciais apenas no `inventory/vault.enc`
+   - Garantir que logs nunca incluam senha/token
+
+4. [ ] **Task A4: Inventário Dinâmico no Lugar do Estático**
+   - Substituir uso de `DEVICE_INVENTORY` estático por consulta ao banco
+   - Permitir ativar/desativar ativos sem editar código
+   - Atualizar `main.py` para consumir inventário persistido
+
+5. [ ] **Task A5: Baseline no Onboarding**
+   - Definir baseline inicial no primeiro snapshot de cada ativo
+   - Permitir atualização controlada de baseline (com trilha de auditoria)
+   - Exibir estado da baseline por dispositivo no dashboard
+
+6. [ ] **Task A6: Detalhe de Incidente com Diff Comercial**
+   - Melhorar visualização baseline × current no detalhe do incidente
+   - Destacar impacto técnico e severidade para leitura executiva
+   - Preparar saída reutilizável para relatório de cliente
+
+7. [ ] **Task A7: Relatório Mensal de Conformidade**
+   - Gerar relatório consolidado por cliente (período, severidades, MTTA/MTTR)
+   - Exportar em formato entregável ao cliente (HTML/PDF)
+   - Incluir evidências de remediações executadas
+
+8. [ ] **Task A8: Testes E2E do Fluxo Operacional**
+   - Cobrir fluxo completo: descoberta → cadastro → auditoria → incidente → dashboard
+   - Adicionar massa de teste baseada no `stress_test.py`
+   - Validar comportamento com falha parcial por dispositivo
 
 ---
 

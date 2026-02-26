@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Discovery de Ativos — SentinelNet_FLS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h4 mb-0">
+    <i class="bi bi-radar me-2 text-success"></i>Discovery de Ativos (Nmap)
+  </h1>
+  <a href="{{ url_for('devices.list_devices') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar para Dispositivos
+  </a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <form method="post" class="row g-3 align-items-end">
+      <div class="col-md-8 col-lg-6">
+        <label class="form-label" for="network">Faixa de rede (CIDR)</label>
+        <input
+          id="network"
+          name="network"
+          type="text"
+          class="form-control"
+          placeholder="Ex: 192.168.88.0/24"
+          value="{{ network }}"
+          required
+        />
+      </div>
+      <div class="col-md-4 col-lg-3">
+        <button type="submit" class="btn btn-success w-100">
+          <i class="bi bi-play-circle me-1"></i>Executar Discovery
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if discovery %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <strong>Resultado da varredura</strong>
+      <span class="text-muted ms-2">Rede: {{ discovery.network }}</span>
+    </div>
+    <div class="text-muted small">
+      {{ discovery.total_hosts }} host(s) ativos • {{ discovery.scanned_at }}
+    </div>
+  </div>
+
+  {% if discovery.total_hosts == 0 %}
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-wifi-off fs-1 d-block mb-2"></i>
+    <p class="mb-0">Nenhum host ativo encontrado para esta faixa de rede.</p>
+  </div>
+  {% else %}
+  <form>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="discover-select-col">Sel.</th>
+              <th>IP</th>
+              <th>Hostname</th>
+              <th>MAC</th>
+              <th>Vendor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for host in discovery.hosts %}
+            <tr>
+              <td>
+                <label class="visually-hidden" for="select-host-{{ loop.index }}">Selecionar host {{ host.ip }}</label>
+                <input
+                  id="select-host-{{ loop.index }}"
+                  class="form-check-input"
+                  type="checkbox"
+                  name="selected_hosts"
+                  value="{{ host.ip }}"
+                  title="Selecionar host {{ host.ip }}"
+                />
+              </td>
+              <td class="fw-semibold">{{ host.ip }}</td>
+              <td>{{ host.hostname or '—' }}</td>
+              <td>{{ host.mac or '—' }}</td>
+              <td>{{ host.vendor or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card-footer bg-white d-flex justify-content-end">
+      <button type="button" class="btn btn-outline-primary" disabled>
+        <i class="bi bi-plus-circle me-1"></i>Cadastrar selecionados (próxima task)
+      </button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

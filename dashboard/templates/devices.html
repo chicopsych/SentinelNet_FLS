@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Dispositivos — SentinelNet{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h4 mb-0">
+    <i class="bi bi-router me-2 text-primary"></i>Dispositivos Monitorados
+    <span class="badge bg-secondary ms-2">{{ total }}</span>
+  </h1>
+
+  <a href="{{ url_for('devices.discover_devices') }}" class="btn btn-sm btn-outline-success">
+    <i class="bi bi-radar me-1"></i>Discovery via Nmap
+  </a>
+
+  <!-- Filtros -->
+  <form method="get" class="d-flex gap-2 flex-wrap">
+    <input
+      type="text" name="customer" value="{{ request.args.get('customer', '') }}"
+      class="form-control form-control-sm" placeholder="Filtrar por cliente"
+      style="width:160px"
+    />
+    <input
+      type="text" name="vendor" value="{{ request.args.get('vendor', '') }}"
+      class="form-control form-control-sm" placeholder="Filtrar por vendor"
+      style="width:140px"
+    />
+    <button type="submit" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-funnel me-1"></i>Filtrar
+    </button>
+    {% if request.args.get('customer') or request.args.get('vendor') %}
+    <a href="{{ url_for('devices.list_devices') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-x-circle me-1"></i>Limpar
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+{% if not devices %}
+<!-- Empty state -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+    <p class="mb-0">Nenhum dispositivo encontrado com os filtros aplicados.</p>
+  </div>
+</div>
+
+{% else %}
+<!-- Tabela de dispositivos -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Status</th>
+            <th>Dispositivo</th>
+            <th>Cliente</th>
+            <th>Vendor</th>
+            <th class="text-center">Incidentes Abertos</th>
+            <th>Maior Severidade</th>
+            <th>Ultima Ocorrencia</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for dev in devices %}
+          <tr>
+            <!-- Status indicator -->
+            <td>
+              {% if dev.status == 'critical' %}
+                <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>critical</span>
+              {% elif dev.status == 'warning' %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill me-1"></i>warning</span>
+              {% elif dev.status == 'info' %}
+                <span class="badge bg-info text-dark"><i class="bi bi-info-circle-fill me-1"></i>info</span>
+              {% else %}
+                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>ok</span>
+              {% endif %}
+            </td>
+
+            <td class="fw-semibold">{{ dev.device_id }}</td>
+            <td>{{ dev.customer_id }}</td>
+            <td>
+              {% if dev.vendor | lower == 'mikrotik' %}
+                <i class="bi bi-cpu me-1 text-danger"></i>{{ dev.vendor }}
+              {% elif dev.vendor | lower == 'cisco' %}
+                <i class="bi bi-cpu me-1 text-primary"></i>{{ dev.vendor }}
+              {% else %}
+                <i class="bi bi-cpu me-1 text-secondary"></i>{{ dev.vendor }}
+              {% endif %}
+            </td>
+
+            <td class="text-center">
+              {% if dev.open_incidents > 0 %}
+                <span class="badge bg-danger rounded-pill">{{ dev.open_incidents }}</span>
+              {% else %}
+                <span class="text-muted">0</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% set sev = dev.worst_severity | upper %}
+              {% if sev == 'CRITICAL' %}
+                <span class="badge bg-danger">CRITICAL</span>
+              {% elif sev == 'HIGH' %}
+                <span class="badge bg-warning text-dark">HIGH</span>
+              {% elif sev == 'WARNING' %}
+                <span class="badge bg-info text-dark">WARNING</span>
+              {% elif sev == 'INFO' %}
+                <span class="badge bg-light text-dark border">INFO</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+
+            <td class="text-muted small">
+              {{ dev.last_seen if dev.last_seen else '—' }}
+            </td>
+
+            <td>
+              <a
+                href="{{ url_for('incidents.list_incidents') }}?device_id={{ dev.device_id }}"
+                class="btn btn-sm btn-outline-secondary"
+                title="Ver incidentes deste dispositivo"
+              >
+                <i class="bi bi-list-ul"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
