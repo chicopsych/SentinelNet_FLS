@@ -9,14 +9,13 @@ Endpoints:
 
 from __future__ import annotations
 
-import sqlite3
 from typing import Any
 
 from flask import Blueprint, flash, jsonify, render_template, request
 
-from dashboard.common.constants import DB_PATH, OPEN_INCIDENT_STATUSES, RANK_TO_SEVERITY, SEVERITY_STATUS
-from dashboard.common.db import db_exists
+from dashboard.common.constants import SEVERITY_STATUS
 from dashboard.common.http import wants_json
+from dashboard.repositories.incidents_repository import list_open_summary_by_device
 from inventory.customer.customer import DEVICE_INVENTORY
 from dashboard.services.discovery import DiscoveryError, run_nmap_discovery
 
@@ -31,44 +30,15 @@ def _incidents_by_device() -> dict[str, dict[str, Any]]:
     para todos os dispositivos com incidentes abertos.
     Retorna {} se o banco não existir.
     """
-    if not db_exists():
-        return {}
-
-    placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            f"""
-            SELECT device_id,
-                   COUNT(*)         AS open_incidents,
-                   MAX(CASE severity
-                       WHEN 'CRITICAL' THEN 5
-                       WHEN 'HIGH'     THEN 4
-                       WHEN 'MEDIUM'   THEN 3
-                       WHEN 'WARNING'  THEN 2
-                       WHEN 'LOW'      THEN 1
-                       WHEN 'INFO'     THEN 0
-                       ELSE 0 END)  AS sev_rank,
-                   MAX(UPPER(severity)) AS worst_sev_raw,
-                   MAX(timestamp)   AS last_seen
-            FROM   incidents
-            WHERE  status IN ({placeholders})
-            GROUP  BY device_id
-            """,
-            tuple(OPEN_INCIDENT_STATUSES),
-        ).fetchall()
-
-    # Monta dict por device_id com a severidade mais alta em texto
+    raw = list_open_summary_by_device()
     result: dict[str, dict[str, Any]] = {}
-    for r in rows:
-        device_id = r["device_id"]
-        # Recalcula worst_severity como string
-        worst_sev = RANK_TO_SEVERITY.get(r["sev_rank"], "INFO")
+    for device_id, payload in raw.items():
+        worst_sev = payload.get("worst_severity", "INFO")
         result[device_id] = {
-            "open_incidents": r["open_incidents"],
+            "open_incidents": payload.get("open_incidents", 0),
             "worst_severity": worst_sev,
-            "status":         SEVERITY_STATUS.get(worst_sev, "info"),
-            "last_seen":      r["last_seen"],
+            "status": SEVERITY_STATUS.get(worst_sev, "info"),
+            "last_seen": payload.get("last_seen"),
         }
     return result
 

@@ -17,14 +17,15 @@ from typing import Any, Generator
 
 from flask import Blueprint, Response, jsonify, render_template, request, stream_with_context
 
-from dashboard.common.constants import (
-    OPEN_INCIDENT_STATUSES,
-    SSE_DEFAULT_SECONDS,
-    SSE_MAX_SECONDS,
-    SSE_MIN_SECONDS,
-)
-from dashboard.common.db import query_rows
+from dashboard.common.constants import SSE_DEFAULT_SECONDS, SSE_MAX_SECONDS, SSE_MIN_SECONDS
 from dashboard.common.http import wants_json
+from dashboard.repositories.incidents_repository import (
+    count_by_status,
+    count_open_by_severity,
+    count_validated_today,
+    list_distinct_open_devices,
+    list_recent_open,
+)
 from inventory.customer.customer import DEVICE_INVENTORY
 
 health_bp = Blueprint("health", __name__)
@@ -39,69 +40,23 @@ def _get_overview_data() -> dict[str, Any]:
                             dispositivos com incidente aberto, últimos 5
     """
     # ── 1. Contagem de incidentes abertos por severidade ──────────────────
-    placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
-    severity_rows = query_rows(
-        f"""
-        SELECT UPPER(severity) AS sev, COUNT(*) AS cnt
-        FROM   incidents
-        WHERE  status IN ({placeholders})
-        GROUP  BY UPPER(severity)
-        """,
-        tuple(OPEN_INCIDENT_STATUSES),
-    )
-
-    severity_counts: dict[str, int] = {}
-    total_open = 0
-    for row in severity_rows:
-        sev = row["sev"]
-        cnt = row["cnt"]
-        severity_counts[sev] = cnt
-        total_open += cnt
+    severity_counts = count_open_by_severity()
+    total_open = sum(severity_counts.values())
 
     # ── 2. Dispositivos do inventário com ≥1 incidente aberto ────────────
-    devices_with_incident: set[str] = set()
-    if total_open > 0:
-        rows = query_rows(
-            f"""
-            SELECT DISTINCT device_id
-            FROM   incidents
-            WHERE  status IN ({placeholders})
-            """,
-            tuple(OPEN_INCIDENT_STATUSES),
-        )
-        devices_with_incident = {r["device_id"] for r in rows}
+    devices_with_incident = list_distinct_open_devices() if total_open > 0 else set()
 
     total_devices = len(DEVICE_INVENTORY)
     with_incident  = len(devices_with_incident)
     healthy        = total_devices - with_incident
 
     # ── 3. Últimos 5 incidentes abertos ──────────────────────────────────
-    recent_rows = query_rows(
-        f"""
-        SELECT id, timestamp, customer_id, device_id, severity, category, status
-        FROM   incidents
-        WHERE  status IN ({placeholders})
-        ORDER  BY timestamp DESC
-        LIMIT  5
-        """,
-        tuple(OPEN_INCIDENT_STATUSES),
-    )
-    recent_incidents = [dict(r) for r in recent_rows]
+    recent_incidents = list_recent_open(limit=5)
 
     # ── 4. Remediações (placeholder — sem tabela dedicada ainda) ──────────
-    approved_rows = query_rows(
-        "SELECT COUNT(*) AS cnt FROM incidents WHERE status = 'aprovado'"
-    )
-    executed_rows = query_rows(
-        """
-        SELECT COUNT(*) AS cnt FROM incidents
-        WHERE  status = 'validado'
-          AND  date(timestamp) = date('now')
-        """
-    )
-    failed_rows = query_rows(
-        "SELECT COUNT(*) AS cnt FROM incidents WHERE status = 'falhou'"
-    )
+    pending_approval = count_by_status("aprovado")
+    executed_today = count_validated_today()
+    failed = count_by_status("falhou")
 
     return {
         "devices": {
@@ -117,9 +72,9 @@ def _get_overview_data() -> dict[str, Any]:
             "info":     severity_counts.get("INFO", 0),
         },
         "remediation": {
-            "pending_approval": approved_rows[0]["cnt"] if approved_rows else 0,
-            "executed_today":   executed_rows[0]["cnt"] if executed_rows else 0,
-            "failed":           failed_rows[0]["cnt"]   if failed_rows   else 0,
+            "pending_approval": pending_approval,
+            "executed_today": executed_today,
+            "failed": failed,
         },
         "slo": {
             "mtta_minutes": None,

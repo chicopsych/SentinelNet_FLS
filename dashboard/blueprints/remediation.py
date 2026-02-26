@@ -2,37 +2,36 @@
 dashboard/blueprints/remediation.py
 Blueprint de remediação controlada de incidentes.
 
-Endpoints (todos sob /incidents/<id>/remediation/):
-    POST  /incidents/<id>/remediation/suggest   — gera sugestão de correção
-    POST  /incidents/<id>/remediation/approve   — aprova sugestão pendente
-    POST  /incidents/<id>/remediation/execute   — executa remediação aprovada
-    GET   /incidents/<id>/remediation/status    — estado atual do pipeline
+Endpoints API (token):
+    POST  /incidents/<id>/remediation/api/suggest
+    POST  /incidents/<id>/remediation/api/approve
+    POST  /incidents/<id>/remediation/api/execute
+    GET   /incidents/<id>/remediation/api/status
+
+Endpoints UI (form/session):
+    POST  /incidents/<id>/remediation/ui/suggest
+    POST  /incidents/<id>/remediation/ui/approve
+    POST  /incidents/<id>/remediation/ui/execute
 
 Fluxo de estados:
     novo → em_analise → aprovado → executado → validado
                                  ↘ falhou → revertido
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, flash, jsonify, redirect, request, url_for
 
 from .auth import token_required
 
 remediation_bp = Blueprint("remediation", __name__)
 
-
-# ── Estados válidos do pipeline ────────────────────────────────────────────────
-
 VALID_STATES = ("novo", "em_analise", "aprovado", "executado", "falhou", "revertido", "validado")
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+def _to_incident_detail(incident_id: str):
+    return redirect(url_for("incidents.get_incident", incident_id=incident_id))
 
 
 def _suggest_remediation(incident_id: str) -> dict:
-    """
-    Gera sugestão de comandos corretivos para o incidente.
-    TODO: integrar com RemediationService (rule-based + IA opcional).
-    """
     return {
         "incident_id": incident_id,
         "status": "em_analise",
@@ -45,10 +44,6 @@ def _suggest_remediation(incident_id: str) -> dict:
 
 
 def _approve_remediation(incident_id: str, approved_by: str) -> dict:
-    """
-    Registra aprovação da sugestão. Apenas incidentes em `em_analise` podem ser aprovados.
-    TODO: integrar com IncidentRepository e trilha de auditoria.
-    """
     return {
         "incident_id": incident_id,
         "status": "aprovado",
@@ -57,10 +52,6 @@ def _approve_remediation(incident_id: str, approved_by: str) -> dict:
 
 
 def _execute_remediation(incident_id: str, dry_run: bool = True) -> dict:
-    """
-    Executa (ou simula) os comandos corretivos aprovados.
-    TODO: integrar com RemediationService e recoletar snapshot pós-execução.
-    """
     return {
         "incident_id": incident_id,
         "dry_run": dry_run,
@@ -70,43 +61,58 @@ def _execute_remediation(incident_id: str, dry_run: bool = True) -> dict:
     }
 
 
-# ── Rotas ──────────────────────────────────────────────────────────────────────
+@remediation_bp.post("/<incident_id>/remediation/ui/suggest")
+def ui_suggest(incident_id: str):
+    _ = _suggest_remediation(incident_id)
+    flash("Sugestão de remediação gerada (UI).", "info")
+    return _to_incident_detail(incident_id)
 
 
-@remediation_bp.post("/<incident_id>/remediation/suggest")
+@remediation_bp.post("/<incident_id>/remediation/ui/approve")
+def ui_approve(incident_id: str):
+    approved_by = request.form.get("approved_by", "operator")
+    _ = _approve_remediation(incident_id, approved_by)
+    flash("Remediação aprovada (UI).", "success")
+    return _to_incident_detail(incident_id)
+
+
+@remediation_bp.post("/<incident_id>/remediation/ui/execute")
+def ui_execute(incident_id: str):
+    dry_run = str(request.form.get("dry_run", "true")).lower() != "false"
+    _ = _execute_remediation(incident_id, dry_run=dry_run)
+    if dry_run:
+        flash("Dry-run de remediação executado.", "warning")
+    else:
+        flash("Execução de remediação disparada.", "danger")
+    return _to_incident_detail(incident_id)
+
+
+@remediation_bp.post("/<incident_id>/remediation/api/suggest")
 @token_required
-def suggest(incident_id: str):
-    """Gera sugestão de remediação para o incidente informado."""
+def api_suggest(incident_id: str):
     result = _suggest_remediation(incident_id)
     return jsonify(result), 202
 
 
-@remediation_bp.post("/<incident_id>/remediation/approve")
+@remediation_bp.post("/<incident_id>/remediation/api/approve")
 @token_required
-def approve(incident_id: str):
-    """Registra aprovação da sugestão pendente. Requer campo `approved_by` no body."""
+def api_approve(incident_id: str):
     body = request.get_json(silent=True) or {}
     approved_by = body.get("approved_by", "system")
     result = _approve_remediation(incident_id, approved_by)
     return jsonify(result), 200
 
 
-@remediation_bp.post("/<incident_id>/remediation/execute")
+@remediation_bp.post("/<incident_id>/remediation/api/execute")
 @token_required
-def execute(incident_id: str):
-    """
-    Executa a remediação aprovada.
-    Por padrão opera em modo dry-run. Passe `{"dry_run": false}` para execução real.
-    """
+def api_execute(incident_id: str):
     body = request.get_json(silent=True) or {}
     dry_run: bool = body.get("dry_run", True)
     result = _execute_remediation(incident_id, dry_run=dry_run)
     return jsonify(result), 202
 
 
-@remediation_bp.get("/<incident_id>/remediation/status")
+@remediation_bp.get("/<incident_id>/remediation/api/status")
 @token_required
-def status(incident_id: str):
-    """Retorna o estado atual do pipeline de remediação para o incidente."""
-    # TODO: consultar IncidentRepository para estado real
+def api_status(incident_id: str):
     return jsonify({"incident_id": incident_id, "status": "novo", "history": []})

@@ -124,10 +124,12 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 - **Dashboard Flask (`dashboard/` + `run.py`)**
   - App Factory (`create_app`)
   - Blueprints de `auth`, `health`, `devices`, `incidents`, `remediation`
+  - Camadas compartilhadas `dashboard/common` e `dashboard/repositories` para HTTP/DB/queries
   - Templates base com Bootstrap 5 + páginas de overview/incidentes
   - Rota raiz `/` redirecionando para `/health/overview`
   - Overview em tempo real com SSE (`/health/stream`) e fallback por polling (`/health/api/overview`)
   - Rotas de `incidents` e `devices` conectadas ao SQLite real (`inventory/sentinel_data.db`)
+  - Remediação separada em fluxo UI (`/remediation/ui/*`) e API tokenizada (`/remediation/api/*`)
 
 - **Incident Engine (`core/incident_engine.py`)**
   - Tabela `incidents` criada automaticamente no SQLite
@@ -241,6 +243,9 @@ SentinelNet_FLS/
 │   │   ├── constants.py
 │   │   ├── db.py
 │   │   └── http.py
+│   ├── repositories/          # Camada de acesso a dados por domínio
+│   │   ├── __init__.py
+│   │   └── incidents_repository.py
 │   ├── templates/              # Templates Jinja2
 │   │   ├── base.html           # Layout base (Bootstrap 5)
 │   │   ├── overview.html       # Painel executivo KPIs
@@ -316,10 +321,13 @@ python run.py
 - `GET /devices/discover` e `POST /devices/discover` → discovery de ativos por faixa CIDR (nmap)
 - `GET /incidents/` e `GET /incidents/<incident_id>`
 - `GET /auth/verify` (protegido por token)
-- `POST /incidents/<incident_id>/remediation/suggest` (token)
-- `POST /incidents/<incident_id>/remediation/approve` (token)
-- `POST /incidents/<incident_id>/remediation/execute` (token)
-- `GET /incidents/<incident_id>/remediation/status` (token)
+- `POST /incidents/<incident_id>/remediation/ui/suggest` (UI)
+- `POST /incidents/<incident_id>/remediation/ui/approve` (UI)
+- `POST /incidents/<incident_id>/remediation/ui/execute` (UI)
+- `POST /incidents/<incident_id>/remediation/api/suggest` (token)
+- `POST /incidents/<incident_id>/remediation/api/approve` (token)
+- `POST /incidents/<incident_id>/remediation/api/execute` (token)
+- `GET /incidents/<incident_id>/remediation/api/status` (token)
 
 ---
 
@@ -462,9 +470,9 @@ Objetivo: implementar um dashboard operacional completo para **detectar, prioriz
    - `GET /incidents` (lista e filtro de incidentes)
    - `GET /incidents/{id}` (detalhes + evidências)
 2. Implementar endpoint de ação corretiva assistida:
-   - `POST /incidents/{id}/remediation/suggest`
-   - `POST /incidents/{id}/remediation/approve`
-   - `POST /incidents/{id}/remediation/execute` (modo controlado)
+   - `POST /incidents/{id}/remediation/api/suggest`
+   - `POST /incidents/{id}/remediation/api/approve`
+   - `POST /incidents/{id}/remediation/api/execute` (modo controlado)
 3. Garantir RBAC mínimo (operador, revisor, admin) e trilha de aprovação para ações sensíveis.
 4. Incluir rate limit e autenticação por token para integração segura.
 5. Estruturar backend em Flask com Blueprints separados por domínio (health, devices, incidents, remediation, auth).

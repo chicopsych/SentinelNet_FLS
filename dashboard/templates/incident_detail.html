@@ -260,13 +260,11 @@
   <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
     <span><i class="bi bi-wrench me-1 text-primary"></i>Remediação</span>
     {% if incident.status in ['novo', 'em_analise'] %}
-    <button
-      class="btn btn-sm btn-outline-primary"
-      hx-post="{{ url_for('remediation.suggest', incident_id=incident.id) }}"
-      hx-swap="outerHTML"
-    >
-      <i class="bi bi-magic me-1"></i>Gerar sugestão
-    </button>
+    <form method="post" action="{{ url_for('remediation.ui_suggest', incident_id=incident.id) }}">
+      <button class="btn btn-sm btn-outline-primary" type="submit">
+        <i class="bi bi-magic me-1"></i>Gerar sugestão
+      </button>
+    </form>
     {% endif %}
   </div>
   <div class="card-body">
@@ -279,7 +277,7 @@
     <div class="d-flex gap-2 mt-3">
       {% if incident.remediation.status == 'em_analise' %}
       <form method="post"
-            action="{{ url_for('remediation.approve', incident_id=incident.id) }}">
+            action="{{ url_for('remediation.ui_approve', incident_id=incident.id) }}">
         <button type="submit" class="btn btn-success btn-sm">
           <i class="bi bi-check-lg me-1"></i>Aprovar
         </button>
@@ -287,14 +285,14 @@
       {% endif %}
       {% if incident.remediation.status == 'aprovado' %}
       <form method="post"
-            action="{{ url_for('remediation.execute', incident_id=incident.id) }}">
+            action="{{ url_for('remediation.ui_execute', incident_id=incident.id) }}">
         <input type="hidden" name="dry_run" value="true" />
         <button type="submit" class="btn btn-outline-warning btn-sm">
           <i class="bi bi-play me-1"></i>Dry Run
         </button>
       </form>
       <form method="post"
-            action="{{ url_for('remediation.execute', incident_id=incident.id) }}">
+            action="{{ url_for('remediation.ui_execute', incident_id=incident.id) }}">
         <input type="hidden" name="dry_run" value="false" />
         <button type="submit" class="btn btn-danger btn-sm">
           <i class="bi bi-lightning me-1"></i>Executar
