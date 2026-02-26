@@ -21,6 +21,9 @@ netmiko>=4.0
 # Alternativa ao TextFSM com sintaxe mais próxima do Jinja2.
 ttp>=0.9
 
+# ─── SNMP (checar disponibilidade do protocolo) ─────────────────────────
+pysnmp>=4.4
+
 # ─── Criptografia de Credenciais (Task 07) ───────────────────────────────────
 # Fernet: criptografia simétrica (AES-128-CBC + HMAC-SHA256) para armazenar
 # senhas de dispositivos de rede em repouso. A Master Key fica em variável

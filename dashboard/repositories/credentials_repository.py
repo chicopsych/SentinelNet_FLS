@@ -16,6 +16,7 @@ def save_device_credentials(
     password: str,
     port: int,
     token: str | None = None,
+    snmp_community: str | None = None,
 ) -> tuple[bool, str]:
     if not username.strip() or not password:
         return False, "Informe credenciais válidas (username e password)."
@@ -30,6 +31,7 @@ def save_device_credentials(
             password=password,
             port=port,
             token=token.strip() if token else None,
+            snmp_community=snmp_community.strip() if snmp_community else None,
         )
     except MasterKeyNotFoundError:
         return (

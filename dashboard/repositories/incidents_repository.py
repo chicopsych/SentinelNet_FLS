@@ -302,6 +302,30 @@ def count_validated_today() -> int:
     return rows[0]["cnt"] if rows else 0
 
 
+def delete_orphan_incidents(device_ids: set[str]) -> int:
+    """Remove incidentes sem dispositivo cadastrado no inventario."""
+    ensure_incidents_table()
+    conn = get_connection()
+    if conn is None:
+        return 0
+
+    try:
+        if not device_ids:
+            cursor = conn.execute("DELETE FROM incidents")
+            conn.commit()
+            return cursor.rowcount
+
+        placeholders = ",".join("?" * len(device_ids))
+        cursor = conn.execute(
+            f"DELETE FROM incidents WHERE device_id NOT IN ({placeholders})",
+            tuple(device_ids),
+        )
+        conn.commit()
+        return cursor.rowcount
+    finally:
+        conn.close()
+
+
 def list_open_summary_by_device() -> dict[str, dict[str, Any]]:
     ensure_incidents_table()
     placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))

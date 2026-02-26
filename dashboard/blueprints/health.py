@@ -15,40 +15,97 @@ import json
 import time
 from typing import Any, Generator
 
-from flask import Blueprint, Response, jsonify, render_template, request, stream_with_context
+from flask import (
+    Blueprint,
+    Response,
+    jsonify,
+    render_template,
+    request,
+    stream_with_context,
+)
 
-from dashboard.common.constants import SSE_DEFAULT_SECONDS, SSE_MAX_SECONDS, SSE_MIN_SECONDS
+from dashboard.common.constants import (
+    SSE_DEFAULT_SECONDS,
+    SSE_MAX_SECONDS,
+    SSE_MIN_SECONDS,
+)
 from dashboard.common.http import wants_json
+from dashboard.repositories.devices_repository import (
+    ensure_inventory_table,
+    list_active_inventory_devices,
+    list_inventory_devices,
+)
 from dashboard.repositories.incidents_repository import (
     count_by_status,
     count_open_by_severity,
     count_validated_today,
+    delete_orphan_incidents,
     list_distinct_open_devices,
     list_recent_open,
 )
-from inventory.customer.customer import DEVICE_INVENTORY
+from dashboard.services.reachability import (
+    check_device_reachability,
+    load_snmp_communities,
+)
 
 health_bp = Blueprint("health", __name__)
 
+
 def _get_overview_data() -> dict[str, Any]:
     """
-    Monta os KPIs consolidados consultando o SQLite e o DEVICE_INVENTORY.
+    Monta os KPIs consolidados consultando o SQLite.
 
     Fontes:
-      - DEVICE_INVENTORY  → total_devices (fonte de verdade do inventário)
-      - tabela incidents  → contagens de incidentes abertos por severidade,
-                            dispositivos com incidente aberto, últimos 5
+            - tabela inventory_devices → total_devices
+                (fonte de verdade do inventário)
+      - tabela incidents → contagens de incidentes abertos por severidade,
+        dispositivos com incidente aberto, últimos 5
     """
-    # ── 1. Contagem de incidentes abertos por severidade ──────────────────
+    # ── 1. Inventario persistido (total e ativos) ───────────────────────
+    ensure_inventory_table()
+    inventory_entries = list_inventory_devices()
+    inventory_ids = {
+        entry.get("device_id")
+        for entry in inventory_entries
+        if entry.get("device_id")
+    }
+    active_entries = list_active_inventory_devices()
+    active_ids = {
+        entry.get("device_id")
+        for entry in active_entries
+        if entry.get("device_id")
+    }
+
+    # ── 2. Limpeza de incidentes orfaos ─────────────────────────────────
+    delete_orphan_incidents(inventory_ids)
+
+    # ── 3. Contagem de incidentes abertos por severidade ─────────────────
     severity_counts = count_open_by_severity()
     total_open = sum(severity_counts.values())
 
-    # ── 2. Dispositivos do inventário com ≥1 incidente aberto ────────────
-    devices_with_incident = list_distinct_open_devices() if total_open > 0 else set()
+    # ── 4. Dispositivos ativos com ≥1 incidente aberto ──────────────────
+    open_devices = list_distinct_open_devices() if total_open > 0 else set()
+    devices_with_incident = set(open_devices).intersection(active_ids)
 
-    total_devices = len(DEVICE_INVENTORY)
-    with_incident  = len(devices_with_incident)
-    healthy        = total_devices - with_incident
+    # ── 5. Reachability por ping/SNMP (ativo) ───────────────────────────
+    snmp_map = load_snmp_communities()
+    warning_devices: set[str] = set()
+    for entry in active_entries:
+        device_id = entry.get("device_id")
+        if not device_id:
+            continue
+        snmp_community = snmp_map.get((entry.get("customer_id"), device_id))
+        reachability = check_device_reachability(
+            host=entry.get("host", ""),
+            snmp_community=snmp_community,
+        )
+        if reachability.get("warning"):
+            warning_devices.add(device_id)
+
+    total_devices = len(active_entries)
+    with_incident = len(devices_with_incident)
+    unhealthy = devices_with_incident.union(warning_devices)
+    healthy = total_devices - len(unhealthy)
 
     # ── 3. Últimos 5 incidentes abertos ──────────────────────────────────
     recent_incidents = list_recent_open(limit=5)
@@ -63,6 +120,7 @@ def _get_overview_data() -> dict[str, Any]:
             "total":         total_devices,
             "healthy":       max(healthy, 0),
             "with_incident": with_incident,
+            "warning":       len(warning_devices),
         },
         "incidents": {
             "open":     total_open,
@@ -84,7 +142,7 @@ def _get_overview_data() -> dict[str, Any]:
     }
 
 
-# ── SSE Generator ──────────────────────────────────────────────────────────────
+# ── SSE Generator ────────────────────────────────────────────────────────────
 
 
 def _sse_generator(interval: int) -> Generator[str, None, None]:
@@ -102,12 +160,15 @@ def _sse_generator(interval: int) -> Generator[str, None, None]:
         time.sleep(interval)
 
 
-# ── Rotas ──────────────────────────────────────────────────────────────────────
+# ── Rotas ────────────────────────────────────────────────────────────────────
 
 
 @health_bp.get("/overview")
 def overview():
-    """Painel executivo com KPIs. Retorna HTML ou JSON conforme Accept header."""
+    """Painel executivo com KPIs.
+
+    Retorna HTML ou JSON conforme Accept header.
+    """
     data = _get_overview_data()
 
     if wants_json(request):

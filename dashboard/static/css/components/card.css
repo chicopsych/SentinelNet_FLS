@@ -1,3 +1,37 @@
 .card {
   border-radius: var(--sn-radius-md);
 }
+
+/* Card link wrapper - remove decoração de link */
+.card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.card-link:hover,
+.card-link:focus {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Cards clicáveis com efeitos de hover */
+.card-clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.card-clickable:active {
+  transform: translateY(0);
+}
+
+/* Acessibilidade - destaque de foco para navegação por teclado */
+.card-link:focus-visible .card-clickable {
+  outline: 2px solid var(--bs-primary, #0d6efd);
+  outline-offset: 2px;
+}

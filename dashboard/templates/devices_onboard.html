@@ -47,6 +47,16 @@
         <label for="token" class="form-label">Token (opcional)</label>
         <input id="token" name="token" type="password" class="form-control" value="{{ form.token }}" />
       </div>
+      <div class="col-md-4">
+        <label for="snmp_community" class="form-label">SNMP community (opcional)</label>
+        <input
+          id="snmp_community"
+          name="snmp_community"
+          type="password"
+          class="form-control"
+          value="{{ form.snmp_community }}"
+        />
+      </div>
       <div class="col-12">
         <div class="alert alert-secondary py-2 mb-0 small">
           Credenciais são armazenadas apenas no cofre criptografado <code>inventory/vault.enc</code>.

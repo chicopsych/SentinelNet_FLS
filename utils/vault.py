@@ -25,10 +25,11 @@ Design Decisions
    {
        "customer_id": {
            "device_id": {
-               "host": "192.168.1.1",
-               "username": "admin",
-               "password": "s3cret",
-               "port": 22
+            "host": "192.168.1.1",
+            "username": "admin",
+            "password": "s3cret",
+            "port": 22,
+            "snmp_community": "public"
            }
        }
    }
@@ -183,7 +184,8 @@ class VaultManager:
             device_id:   Identificador do dispositivo (ex: ``"borda-01"``).
 
         Returns:
-            Dicionário com ``host``, ``username``, ``password``, ``port``.
+            Dicionário com ``host``, ``username``, ``password``, ``port``
+            e campos opcionais como ``snmp_community``.
 
         Raises:
             VaultCorruptedError: Cofre corrompido ou Master Key incorreta.
@@ -256,6 +258,7 @@ class VaultManager:
         password: str,
         port: int,
         token: str | None = None,
+        snmp_community: str | None = None,
     ) -> None:
         """
         Cria/atualiza credenciais de um dispositivo no cofre criptografado.
@@ -273,6 +276,8 @@ class VaultManager:
         }
         if token:
             data["token"] = token
+        if snmp_community:
+            data["snmp_community"] = snmp_community
 
         payload[customer_id][device_id] = data
         self.encrypt_payload(payload)

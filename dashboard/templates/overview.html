@@ -29,48 +29,54 @@
 <div class="row g-3 mb-4">
 
   <div class="col-sm-6 col-xl-3">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body">
-        <p class="text-muted small mb-1"><i class="bi bi-router me-1"></i>Dispositivos</p>
-        <h2 id="kpi-devices-total" class="fw-bold text-dark">{{ overview.devices.total }}</h2>
-        <div class="d-flex gap-3 mt-2 small">
-          <span class="text-success">
-            <i class="bi bi-check-circle-fill me-1"></i><span id="kpi-devices-healthy">{{ overview.devices.healthy }}</span> saudaveis
-          </span>
-          <span class="text-danger">
-            <i class="bi bi-x-circle-fill me-1"></i><span id="kpi-devices-incident">{{ overview.devices.with_incident }}</span> c/ incidente
-          </span>
+    <a href="{{ url_for('devices.list_devices') }}" class="card-link">
+      <div class="card border-0 shadow-sm h-100 card-clickable">
+        <div class="card-body">
+          <p class="text-muted small mb-1"><i class="bi bi-router me-1"></i>Dispositivos</p>
+          <h2 id="kpi-devices-total" class="fw-bold text-dark">{{ overview.devices.total }}</h2>
+          <div class="d-flex gap-3 mt-2 small">
+            <span class="text-success">
+              <i class="bi bi-check-circle-fill me-1"></i><span id="kpi-devices-healthy">{{ overview.devices.healthy }}</span> saudaveis
+            </span>
+            <span class="text-danger">
+              <i class="bi bi-x-circle-fill me-1"></i><span id="kpi-devices-incident">{{ overview.devices.with_incident }}</span> c/ incidente
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-sm-6 col-xl-3">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body">
-        <p class="text-muted small mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Incidentes Abertos</p>
-        <h2 id="kpi-inc-open" class="fw-bold text-dark">{{ overview.incidents.open }}</h2>
-        <div class="d-flex flex-wrap gap-1 mt-2">
-          <span class="badge bg-danger"><span id="kpi-inc-critical">{{ overview.incidents.critical }}</span> CRITICAL</span>
-          <span class="badge bg-warning text-dark"><span id="kpi-inc-high">{{ overview.incidents.high }}</span> HIGH</span>
-          <span class="badge bg-info text-dark"><span id="kpi-inc-warning">{{ overview.incidents.warning }}</span> WARNING</span>
-          <span class="badge bg-light text-dark border"><span id="kpi-inc-info">{{ overview.incidents.info }}</span> INFO</span>
+    <a href="{{ url_for('incidents.list_incidents', status='novo') }}" class="card-link">
+      <div class="card border-0 shadow-sm h-100 card-clickable">
+        <div class="card-body">
+          <p class="text-muted small mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Incidentes Abertos</p>
+          <h2 id="kpi-inc-open" class="fw-bold text-dark">{{ overview.incidents.open }}</h2>
+          <div class="d-flex flex-wrap gap-1 mt-2">
+            <span class="badge bg-danger"><span id="kpi-inc-critical">{{ overview.incidents.critical }}</span> CRITICAL</span>
+            <span class="badge bg-warning text-dark"><span id="kpi-inc-high">{{ overview.incidents.high }}</span> HIGH</span>
+            <span class="badge bg-info text-dark"><span id="kpi-inc-warning">{{ overview.incidents.warning }}</span> WARNING</span>
+            <span class="badge bg-light text-dark border"><span id="kpi-inc-info">{{ overview.incidents.info }}</span> INFO</span>
+          </div>
         </div>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-sm-6 col-xl-3">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body">
-        <p class="text-muted small mb-1"><i class="bi bi-wrench me-1"></i>Remediacoes</p>
-        <h2 id="kpi-remed-pending" class="fw-bold text-dark">{{ overview.remediation.pending_approval }}</h2>
-        <p class="text-muted small mt-2 mb-0">aguardando aprovacao</p>
-        <p class="text-success small mb-0">
-          <span id="kpi-remed-executed">{{ overview.remediation.executed_today }}</span> executadas hoje
-        </p>
+    <a href="{{ url_for('incidents.list_incidents', status='aprovado') }}" class="card-link">
+      <div class="card border-0 shadow-sm h-100 card-clickable">
+        <div class="card-body">
+          <p class="text-muted small mb-1"><i class="bi bi-wrench me-1"></i>Remediacoes</p>
+          <h2 id="kpi-remed-pending" class="fw-bold text-dark">{{ overview.remediation.pending_approval }}</h2>
+          <p class="text-muted small mt-2 mb-0">aguardando aprovacao</p>
+          <p class="text-success small mb-0">
+            <span id="kpi-remed-executed">{{ overview.remediation.executed_today }}</span> executadas hoje
+          </p>
+        </div>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-sm-6 col-xl-3">

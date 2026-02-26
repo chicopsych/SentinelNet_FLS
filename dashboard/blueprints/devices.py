@@ -5,18 +5,28 @@ Blueprint de visão de dispositivos monitorados.
 Endpoints:
     GET /devices              — lista de dispositivos com status de saúde real
     GET /devices/<device_id>  — detalhe de um dispositivo específico
-    POST /devices/toggle-active — ativa/desativa dispositivo no inventário persistido
+    POST /devices/toggle-active — ativa/desativa dispositivo no inventário
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 
 from dashboard.common.constants import SEVERITY_STATUS
 from dashboard.common.http import wants_json
-from dashboard.repositories.credentials_repository import save_device_credentials
+from dashboard.repositories.credentials_repository import (
+    save_device_credentials,
+)
 from dashboard.repositories.devices_repository import (
     create_inventory_device,
     delete_inventory_device,
@@ -25,12 +35,18 @@ from dashboard.repositories.devices_repository import (
     list_inventory_devices,
     set_inventory_device_active,
 )
-from dashboard.repositories.incidents_repository import list_open_summary_by_device
+from dashboard.repositories.incidents_repository import (
+    list_open_summary_by_device,
+)
 from dashboard.services.discovery import DiscoveryError, run_nmap_discovery
+from dashboard.services.reachability import (
+    check_device_reachability,
+    load_snmp_communities,
+)
 
 devices_bp = Blueprint("devices", __name__)
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Helpers ─────────────────────────────────────────────────────────────────
 
 
 def _incidents_by_device() -> dict[str, dict[str, Any]]:
@@ -62,18 +78,36 @@ def _list_devices(
     """
     incidents = _incidents_by_device()
     devices: list[dict] = []
+    snmp_map = load_snmp_communities()
 
     ensure_inventory_table()
     persisted_entries = list_inventory_devices()
 
     for entry in persisted_entries:
-        if customer and entry.get("customer_id", "").lower() != customer.lower():
+        if (
+            customer
+            and entry.get("customer_id", "").lower() != customer.lower()
+        ):
             continue
         if vendor and entry.get("vendor", "").lower() != vendor.lower():
             continue
 
         device_id = entry["device_id"]
         inc_data = incidents.get(device_id, {})
+        status = inc_data.get("status", "ok")
+
+        if entry.get("active", 1):
+            snmp_community = snmp_map.get(
+                (entry.get("customer_id"), device_id)
+            )
+            reachability = check_device_reachability(
+                host=entry.get("host", ""),
+                snmp_community=snmp_community,
+            )
+            if status == "ok" and reachability.get("warning"):
+                status = "warning"
+        else:
+            reachability = {"ping_ok": None, "snmp_ok": None, "warning": False}
 
         devices.append({
             "device_id":      device_id,
@@ -81,9 +115,11 @@ def _list_devices(
             "vendor":         entry.get("vendor", "—"),
             "open_incidents": inc_data.get("open_incidents", 0),
             "worst_severity": inc_data.get("worst_severity", "—"),
-            "status":         inc_data.get("status", "ok"),
+            "status":         status,
             "last_seen":      inc_data.get("last_seen"),
             "active":         bool(entry.get("active", 1)),
+            "ping_ok":        reachability.get("ping_ok"),
+            "snmp_ok":        reachability.get("snmp_ok"),
         })
 
     return devices
@@ -97,34 +133,53 @@ def _parse_port(value: str, default: int = 22) -> int:
 
 
 def _get_device(device_id: str) -> dict | None:
-    """Retorna dados de um dispositivo específico, ou None se não estiver no inventário."""
-    entry = next((d for d in list_inventory_devices() if d["device_id"] == device_id), None)
+    """Retorna dados de um dispositivo específico, ou None."""
+    entry = next(
+        (d for d in list_inventory_devices() if d["device_id"] == device_id),
+        None,
+    )
     if entry is None:
         return None
 
     incidents = _incidents_by_device()
-    inc_data  = incidents.get(device_id, {})
+    inc_data = incidents.get(device_id, {})
+    status = inc_data.get("status", "ok")
+    snmp_map = load_snmp_communities()
+    if entry.get("active", 1):
+        snmp_community = snmp_map.get(
+            (entry.get("customer_id"), device_id)
+        )
+        reachability = check_device_reachability(
+            host=entry.get("host", ""),
+            snmp_community=snmp_community,
+        )
+        if status == "ok" and reachability.get("warning"):
+            status = "warning"
+    else:
+        reachability = {"ping_ok": None, "snmp_ok": None, "warning": False}
     return {
         "device_id":      device_id,
         "customer_id":    entry.get("customer_id", "—"),
         "vendor":         entry.get("vendor", "—"),
         "open_incidents": inc_data.get("open_incidents", 0),
         "worst_severity": inc_data.get("worst_severity", "—"),
-        "status":         inc_data.get("status", "ok"),
+        "status":         status,
         "last_seen":      inc_data.get("last_seen"),
         "active":         bool(entry.get("active", 1)),
+        "ping_ok":        reachability.get("ping_ok"),
+        "snmp_ok":        reachability.get("snmp_ok"),
     }
 
 
-# ── Rotas ──────────────────────────────────────────────────────────────────────
+# ── Rotas ─────────────────────────────────────────────────────────────────
 
 
 @devices_bp.get("/")
 def list_devices():
-    """Lista todos os dispositivos com filtros opcionais por cliente e vendor."""
+    """Lista dispositivos com filtros opcionais por cliente e vendor."""
     customer = request.args.get("customer")
-    vendor   = request.args.get("vendor")
-    devices  = _list_devices(customer=customer, vendor=vendor)
+    vendor = request.args.get("vendor")
+    devices = _list_devices(customer=customer, vendor=vendor)
 
     if wants_json(request):
         return jsonify({"devices": devices, "total": len(devices)})
@@ -141,7 +196,9 @@ def discover_devices():
 
     if request.method == "POST":
         if not network.strip():
-            error_message = "Informe uma faixa de rede em CIDR (ex: 192.168.88.0/24)."
+            error_message = (
+                "Informe uma faixa de rede em CIDR (ex: 192.168.88.0/24)."
+            )
         else:
             try:
                 discovery = run_nmap_discovery(network)
@@ -152,16 +209,23 @@ def discover_devices():
         if error_message:
             return jsonify({"error": error_message}), 400
         if discovery is None:
-            return jsonify({
-                "message": "Envie POST com campo 'network' para executar discovery.",
-                "example": {"network": "192.168.88.0/24"},
-            })
-        return jsonify({
-            "network": discovery.network,
-            "scanned_at": discovery.scanned_at,
-            "total_hosts": discovery.total_hosts,
-            "hosts": discovery.hosts,
-        })
+            return jsonify(
+                {
+                    "message": (
+                        "Envie POST com campo 'network' para executar "
+                        "discovery."
+                    ),
+                    "example": {"network": "192.168.88.0/24"},
+                }
+            )
+        return jsonify(
+            {
+                "network": discovery.network,
+                "scanned_at": discovery.scanned_at,
+                "total_hosts": discovery.total_hosts,
+                "hosts": discovery.hosts,
+            }
+        )
 
     if error_message:
         flash(error_message, "danger")
@@ -184,6 +248,7 @@ def onboard_device():
         "porta": request.values.get("porta", "22"),
         "username": request.values.get("username", ""),
         "token": request.values.get("token", ""),
+        "snmp_community": request.values.get("snmp_community", ""),
     }
 
     if request.method == "POST":
@@ -195,6 +260,7 @@ def onboard_device():
         username = form_data["username"].strip()
         password = request.form.get("password", "")
         token = form_data["token"].strip() or None
+        snmp_community = form_data["snmp_community"].strip() or None
 
         ok, message = create_inventory_device(
             customer_id=customer,
@@ -212,11 +278,15 @@ def onboard_device():
                 password=password,
                 port=port,
                 token=token,
+                snmp_community=snmp_community,
             )
 
             if not cred_ok:
                 delete_inventory_device(customer_id=customer, device_id=device)
-                flash(f"{cred_msg} Cadastro do dispositivo revertido.", "danger")
+                flash(
+                    f"{cred_msg} Cadastro do dispositivo revertido.",
+                    "danger",
+                )
             else:
                 flash(message, "success")
                 flash(cred_msg, "info")
@@ -230,13 +300,19 @@ def onboard_device():
                         "porta": "22",
                         "username": "",
                         "token": "",
+                        "snmp_community": "",
                     },
                 )
 
         flash(message, "danger")
 
     if wants_json(request):
-        return jsonify({"message": "Use POST para cadastrar dispositivo.", "form": form_data})
+        return jsonify(
+            {
+                "message": "Use POST para cadastrar dispositivo.",
+                "form": form_data,
+            }
+        )
 
     return render_template("devices_onboard.html", form=form_data)
 
@@ -252,13 +328,31 @@ def toggle_device_active():
     vendor_filter = request.form.get("vendor_filter", "").strip()
 
     if not customer_id or not device_id:
-        flash("Identificação de dispositivo inválida para alteração de status.", "danger")
-        return redirect(url_for("devices.list_devices", customer=customer_filter, vendor=vendor_filter))
+        flash(
+            "Identificação de dispositivo inválida para alteração de status.",
+            "danger",
+        )
+        return redirect(
+            url_for(
+                "devices.list_devices",
+                customer=customer_filter,
+                vendor=vendor_filter,
+            )
+        )
 
-    existing = get_inventory_device(customer_id=customer_id, device_id=device_id)
+    existing = get_inventory_device(
+        customer_id=customer_id,
+        device_id=device_id,
+    )
     if existing is None:
         flash("Dispositivo não encontrado no inventário persistido.", "danger")
-        return redirect(url_for("devices.list_devices", customer=customer_filter, vendor=vendor_filter))
+        return redirect(
+            url_for(
+                "devices.list_devices",
+                customer=customer_filter,
+                vendor=vendor_filter,
+            )
+        )
 
     ok, message = set_inventory_device_active(
         customer_id=customer_id,
@@ -272,7 +366,13 @@ def toggle_device_active():
         status_code = 200 if ok else 404
         return jsonify({"ok": ok, "message": message}), status_code
 
-    return redirect(url_for("devices.list_devices", customer=customer_filter, vendor=vendor_filter))
+    return redirect(
+        url_for(
+            "devices.list_devices",
+            customer=customer_filter,
+            vendor=vendor_filter,
+        )
+    )
 
 
 @devices_bp.get("/<device_id>")
@@ -280,5 +380,7 @@ def get_device(device_id: str):
     """Retorna estado e metadados de um dispositivo específico."""
     device = _get_device(device_id)
     if device is None:
-        return jsonify({"error": f"Dispositivo '{device_id}' não encontrado."}), 404
+        return jsonify(
+            {"error": f"Dispositivo '{device_id}' não encontrado."}
+        ), 404
     return jsonify(device)
