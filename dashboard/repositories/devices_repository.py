@@ -47,6 +47,20 @@ def list_inventory_devices() -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def list_active_inventory_devices() -> list[dict[str, Any]]:
+    ensure_inventory_table()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT customer_id, device_id, vendor, host, port, active, created_at
+            FROM inventory_devices
+            WHERE active = 1
+            ORDER BY customer_id, device_id
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def create_inventory_device(
     *,
     customer_id: str,
@@ -109,3 +123,39 @@ def delete_inventory_device(*, customer_id: str, device_id: str) -> None:
             (customer_id, device_id),
         )
         conn.commit()
+
+
+def set_inventory_device_active(*, customer_id: str, device_id: str, active: bool) -> tuple[bool, str]:
+    ensure_inventory_table()
+    with _connect() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE inventory_devices
+            SET active = ?
+            WHERE customer_id = ? AND device_id = ?
+            """,
+            (1 if active else 0, customer_id, device_id),
+        )
+        conn.commit()
+
+    if cursor.rowcount == 0:
+        return False, "Dispositivo não encontrado para atualização de status."
+
+    if active:
+        return True, "Dispositivo ativado para monitoramento."
+    return True, "Dispositivo desativado do monitoramento."
+
+
+def get_inventory_device(*, customer_id: str, device_id: str) -> dict[str, Any] | None:
+    ensure_inventory_table()
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT customer_id, device_id, vendor, host, port, active, created_at
+            FROM inventory_devices
+            WHERE customer_id = ? AND device_id = ?
+            LIMIT 1
+            """,
+            (customer_id, device_id),
+        ).fetchone()
+    return dict(row) if row else None

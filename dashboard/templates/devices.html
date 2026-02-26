@@ -64,6 +64,7 @@
             <th>Dispositivo</th>
             <th>Cliente</th>
             <th>Vendor</th>
+            <th>Monitoramento</th>
             <th class="text-center">Incidentes Abertos</th>
             <th>Maior Severidade</th>
             <th>Ultima Ocorrencia</th>
@@ -111,6 +112,14 @@
               {% endif %}
             </td>
 
+            <td>
+              {% if dev.active %}
+                <span class="badge bg-success">Ativo</span>
+              {% else %}
+                <span class="badge bg-secondary">Inativo</span>
+              {% endif %}
+            </td>
+
             <td class="text-center">
               {% if dev.open_incidents > 0 %}
                 <span class="badge bg-danger rounded-pill">{{ dev.open_incidents }}</span>
@@ -133,13 +142,31 @@
             </td>
 
             <td>
-              <a
-                href="{{ url_for('incidents.list_incidents') }}?device_id={{ dev.device_id }}"
-                class="btn btn-sm btn-outline-secondary"
-                title="Ver incidentes deste dispositivo"
-              >
-                <i class="bi bi-list-ul"></i>
-              </a>
+              <div class="d-flex gap-1">
+                <a
+                  href="{{ url_for('incidents.list_incidents') }}?device_id={{ dev.device_id }}"
+                  class="btn btn-sm btn-outline-secondary"
+                  title="Ver incidentes deste dispositivo"
+                >
+                  <i class="bi bi-list-ul"></i>
+                </a>
+                <form method="post" action="{{ url_for('devices.toggle_device_active') }}">
+                  <input type="hidden" name="customer_id" value="{{ dev.customer_id }}" />
+                  <input type="hidden" name="device_id" value="{{ dev.device_id }}" />
+                  <input type="hidden" name="active" value="{{ 0 if dev.active else 1 }}" />
+                  <input type="hidden" name="customer_filter" value="{{ request.args.get('customer', '') }}" />
+                  <input type="hidden" name="vendor_filter" value="{{ request.args.get('vendor', '') }}" />
+                  {% if dev.active %}
+                  <button class="btn btn-sm btn-outline-warning" type="submit" title="Desativar monitoramento">
+                    <i class="bi bi-pause-circle"></i>
+                  </button>
+                  {% else %}
+                  <button class="btn btn-sm btn-outline-success" type="submit" title="Ativar monitoramento">
+                    <i class="bi bi-play-circle"></i>
+                  </button>
+                  {% endif %}
+                </form>
+              </div>
             </td>
           </tr>
           {% endfor %}

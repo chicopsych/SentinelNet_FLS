@@ -325,6 +325,7 @@ FLASK_ENV=production python run.py
 - `GET /devices/` e `GET /devices/<device_id>`
 - `GET /devices/discover` e `POST /devices/discover` → discovery de ativos por faixa CIDR (nmap)
 - `GET /devices/onboard` e `POST /devices/onboard` → cadastro manual de ativo com persistência no SQLite
+- `POST /devices/toggle-active` → ativa/desativa ativo no inventário persistido
 - `GET /incidents/` e `GET /incidents/<incident_id>`
 - Filtros de `/incidents/`: `customer`, `device_id`, `vendor`, `severity`, `min_severity`, `status`, `start_date`, `end_date`, `sort`, `page`
 - Compatibilidade de status legado em incidentes: `new` é normalizado para `novo` na UI/API
@@ -422,10 +423,10 @@ As tasks abaixo foram adicionadas para manter o desenvolvimento aderente ao plan
    - ✅ Credenciais gravadas exclusivamente no cofre criptografado `inventory/vault.enc`
    - ✅ Logging sem exposição de segredo (senha/token não são registrados)
 
-4. [ ] **Task A4: Inventário Dinâmico no Lugar do Estático**
-   - Substituir uso de `DEVICE_INVENTORY` estático por consulta ao banco
-   - Permitir ativar/desativar ativos sem editar código
-   - Atualizar `main.py` para consumir inventário persistido
+4. [x] **Task A4: Inventário Dinâmico no Lugar do Estático**
+   - ✅ Substituído uso de `DEVICE_INVENTORY` estático por consulta ao SQLite (`inventory_devices`)
+   - ✅ Ativação/desativação de ativos pelo dashboard sem editar código (`POST /devices/toggle-active`)
+   - ✅ `main.py` atualizado para consumir apenas inventário persistido ativo
 
 5. [ ] **Task A5: Baseline no Onboarding**
    - Definir baseline inicial no primeiro snapshot de cada ativo

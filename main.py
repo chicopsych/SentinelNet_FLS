@@ -4,7 +4,7 @@ main.py
 Ponto de entrada do SentinelNet_FLS — Loop de Auditoria Completo.
 
 Fluxo:
-    1. Carrega inventário de inventory/customer/customer.py.
+    1. Carrega inventário persistido (SQLite) da tabela inventory_devices.
     2. Para cada dispositivo:
        a) Obtém credenciais via VaultManager (sem expor segredos nos logs).
        b) Instancia o driver correto (ex: MikroTikDriver).
@@ -24,8 +24,8 @@ from core import DiffEngine
 from core.incident_engine import incident_engine
 from core.schemas import DeviceConfig
 from drivers.mikrotik_driver import MikroTikDriver
+from dashboard.repositories.devices_repository import list_active_inventory_devices
 from internalloggin.logger import setup_logger
-from inventory.customer.customer import DEVICE_INVENTORY
 from utils.vault import CredentialNotFoundError, MasterKeyNotFoundError, VaultError, VaultManager
 
 logger = setup_logger(__name__)
@@ -185,7 +185,12 @@ def run_audit_loop() -> None:
     não interrompe os demais.
     """
     logger.info("SentinelNet_FLS — Loop de Auditoria iniciado.")
-    logger.info("Dispositivos no inventário: %d", len(DEVICE_INVENTORY))
+    inventory_devices = list_active_inventory_devices()
+    logger.info("Dispositivos ativos no inventário: %d", len(inventory_devices))
+
+    if not inventory_devices:
+        logger.warning("Nenhum dispositivo ativo encontrado no inventário persistido. Auditoria encerrada.")
+        return
 
     # Inicializa o VaultManager uma única vez para toda a rodada
     try:
@@ -203,7 +208,7 @@ def run_audit_loop() -> None:
     success_count = 0
     failure_count = 0
 
-    for device_info in DEVICE_INVENTORY:
+    for device_info in inventory_devices:
         customer_id = device_info.get("customer_id", "?")
         device_id = device_info.get("device_id", "?")
         try:

@@ -5,13 +5,14 @@ Blueprint de visão de dispositivos monitorados.
 Endpoints:
     GET /devices              — lista de dispositivos com status de saúde real
     GET /devices/<device_id>  — detalhe de um dispositivo específico
+    POST /devices/toggle-active — ativa/desativa dispositivo no inventário persistido
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from flask import Blueprint, flash, jsonify, render_template, request
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
 from dashboard.common.constants import SEVERITY_STATUS
 from dashboard.common.http import wants_json
@@ -20,10 +21,11 @@ from dashboard.repositories.devices_repository import (
     create_inventory_device,
     delete_inventory_device,
     ensure_inventory_table,
+    get_inventory_device,
     list_inventory_devices,
+    set_inventory_device_active,
 )
 from dashboard.repositories.incidents_repository import list_open_summary_by_device
-from inventory.customer.customer import DEVICE_INVENTORY
 from dashboard.services.discovery import DiscoveryError, run_nmap_discovery
 
 devices_bp = Blueprint("devices", __name__)
@@ -55,7 +57,7 @@ def _list_devices(
     vendor: str | None = None,
 ) -> list[dict]:
     """
-    Mescla DEVICE_INVENTORY com dados de incidentes abertos do SQLite.
+    Lista inventário persistido no SQLite com dados de incidentes abertos.
     Filtros opcionais por customer_id e vendor.
     """
     incidents = _incidents_by_device()
@@ -64,21 +66,7 @@ def _list_devices(
     ensure_inventory_table()
     persisted_entries = list_inventory_devices()
 
-    combined: list[dict[str, Any]] = []
-    seen_keys: set[tuple[str, str]] = set()
-
-    for entry in DEVICE_INVENTORY:
-        key = (entry.get("customer_id", ""), entry.get("device_id", ""))
-        seen_keys.add(key)
-        combined.append(entry)
-
     for entry in persisted_entries:
-        key = (entry.get("customer_id", ""), entry.get("device_id", ""))
-        if key in seen_keys:
-            continue
-        combined.append(entry)
-
-    for entry in combined:
         if customer and entry.get("customer_id", "").lower() != customer.lower():
             continue
         if vendor and entry.get("vendor", "").lower() != vendor.lower():
@@ -95,6 +83,7 @@ def _list_devices(
             "worst_severity": inc_data.get("worst_severity", "—"),
             "status":         inc_data.get("status", "ok"),
             "last_seen":      inc_data.get("last_seen"),
+            "active":         bool(entry.get("active", 1)),
         })
 
     return devices
@@ -109,9 +98,7 @@ def _parse_port(value: str, default: int = 22) -> int:
 
 def _get_device(device_id: str) -> dict | None:
     """Retorna dados de um dispositivo específico, ou None se não estiver no inventário."""
-    entry = next(
-        (d for d in DEVICE_INVENTORY if d["device_id"] == device_id), None
-    )
+    entry = next((d for d in list_inventory_devices() if d["device_id"] == device_id), None)
     if entry is None:
         return None
 
@@ -125,6 +112,7 @@ def _get_device(device_id: str) -> dict | None:
         "worst_severity": inc_data.get("worst_severity", "—"),
         "status":         inc_data.get("status", "ok"),
         "last_seen":      inc_data.get("last_seen"),
+        "active":         bool(entry.get("active", 1)),
     }
 
 
@@ -251,6 +239,40 @@ def onboard_device():
         return jsonify({"message": "Use POST para cadastrar dispositivo.", "form": form_data})
 
     return render_template("devices_onboard.html", form=form_data)
+
+
+@devices_bp.post("/toggle-active")
+def toggle_device_active():
+    """Ativa/desativa dispositivo persistido no inventário SQLite."""
+    customer_id = request.form.get("customer_id", "").strip()
+    device_id = request.form.get("device_id", "").strip()
+    active_raw = request.form.get("active", "1").strip()
+    active = active_raw == "1"
+    customer_filter = request.form.get("customer_filter", "").strip()
+    vendor_filter = request.form.get("vendor_filter", "").strip()
+
+    if not customer_id or not device_id:
+        flash("Identificação de dispositivo inválida para alteração de status.", "danger")
+        return redirect(url_for("devices.list_devices", customer=customer_filter, vendor=vendor_filter))
+
+    existing = get_inventory_device(customer_id=customer_id, device_id=device_id)
+    if existing is None:
+        flash("Dispositivo não encontrado no inventário persistido.", "danger")
+        return redirect(url_for("devices.list_devices", customer=customer_filter, vendor=vendor_filter))
+
+    ok, message = set_inventory_device_active(
+        customer_id=customer_id,
+        device_id=device_id,
+        active=active,
+    )
+
+    flash(message, "success" if ok else "danger")
+
+    if wants_json(request):
+        status_code = 200 if ok else 404
+        return jsonify({"ok": ok, "message": message}), status_code
+
+    return redirect(url_for("devices.list_devices", customer=customer_filter, vendor=vendor_filter))
 
 
 @devices_bp.get("/<device_id>")
