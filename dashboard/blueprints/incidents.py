@@ -11,15 +11,14 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
 
-incidents_bp = Blueprint("incidents", __name__)
+from dashboard.common.db import get_connection
+from dashboard.common.http import wants_json
 
-# Caminho do banco SQLite — espelha o definido em IncidentEngine
-_DB_PATH = Path(__file__).resolve().parent.parent.parent / "inventory" / "sentinel_data.db"
+incidents_bp = Blueprint("incidents", __name__)
 
 
 # ── Helpers internos ──────────────────────────────────────────────────────────
@@ -27,11 +26,7 @@ _DB_PATH = Path(__file__).resolve().parent.parent.parent / "inventory" / "sentin
 
 def _get_db() -> sqlite3.Connection | None:
     """Abre conexão row_factory ao banco de incidentes. Retorna None se não existir."""
-    if not _DB_PATH.exists():
-        return None
-    conn = sqlite3.connect(_DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return get_connection()
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
@@ -154,7 +149,7 @@ def list_incidents():
         page=page,
     )
 
-    if _wants_json():
+    if wants_json(request):
         return jsonify({"incidents": incidents, "total": total, "page": page})
 
     return render_template(
@@ -172,19 +167,11 @@ def get_incident(incident_id: int):
     incident = _get_incident(incident_id)
 
     if incident is None:
-        if _wants_json():
+        if wants_json(request):
             return jsonify({"error": f"Incidente '{incident_id}' não encontrado."}), 404
         return render_template("404.html"), 404
 
-    if _wants_json():
+    if wants_json(request):
         return jsonify(incident)
 
     return render_template("incident_detail.html", incident=incident)
-
-
-# ── Utilitários ───────────────────────────────────────────────────────────────
-
-
-def _wants_json() -> bool:
-    best = request.accept_mimetypes.best_match(["application/json", "text/html"])
-    return best == "application/json"

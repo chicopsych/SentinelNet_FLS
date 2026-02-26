@@ -18,13 +18,13 @@
   <form method="get" class="d-flex gap-2 flex-wrap">
     <input
       type="text" name="customer" value="{{ request.args.get('customer', '') }}"
-      class="form-control form-control-sm" placeholder="Filtrar por cliente"
-      style="width:160px"
+      class="form-control form-control-sm sn-filter-customer"
+      placeholder="Filtrar por cliente"
     />
     <input
       type="text" name="vendor" value="{{ request.args.get('vendor', '') }}"
-      class="form-control form-control-sm" placeholder="Filtrar por vendor"
-      style="width:140px"
+      class="form-control form-control-sm sn-filter-vendor"
+      placeholder="Filtrar por vendor"
     />
     <button type="submit" class="btn btn-sm btn-outline-primary">
       <i class="bi bi-funnel me-1"></i>Filtrar
@@ -40,9 +40,10 @@
 {% if not devices %}
 <!-- Empty state -->
 <div class="card border-0 shadow-sm">
-  <div class="card-body text-center text-muted py-5">
-    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-    <p class="mb-0">Nenhum dispositivo encontrado com os filtros aplicados.</p>
+  <div class="card-body">
+    {% set message = "Nenhum dispositivo encontrado com os filtros aplicados." %}
+    {% set icon = "inbox" %}
+    {% include "partials/_empty_state.html" %}
   </div>
 </div>
 
@@ -70,14 +71,27 @@
             <!-- Status indicator -->
             <td>
               {% if dev.status == 'critical' %}
-                <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>critical</span>
+                {% set status = 'critical' %}
+                {% set color = 'danger' %}
+                {% include "partials/_status_badge.html" %}
               {% elif dev.status == 'warning' %}
-                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill me-1"></i>warning</span>
+                {% set status = 'warning' %}
+                {% set color = 'warning' %}
+                {% set text_dark = true %}
+                {% include "partials/_status_badge.html" %}
+                {% set text_dark = false %}
               {% elif dev.status == 'info' %}
-                <span class="badge bg-info text-dark"><i class="bi bi-info-circle-fill me-1"></i>info</span>
+                {% set status = 'info' %}
+                {% set color = 'info' %}
+                {% set text_dark = true %}
+                {% include "partials/_status_badge.html" %}
+                {% set text_dark = false %}
               {% else %}
-                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>ok</span>
+                {% set status = 'ok' %}
+                {% set color = 'success' %}
+                {% include "partials/_status_badge.html" %}
               {% endif %}
+              {% set color = none %}
             </td>
 
             <td class="fw-semibold">{{ dev.device_id }}</td>
@@ -101,15 +115,9 @@
             </td>
 
             <td>
-              {% set sev = dev.worst_severity | upper %}
-              {% if sev == 'CRITICAL' %}
-                <span class="badge bg-danger">CRITICAL</span>
-              {% elif sev == 'HIGH' %}
-                <span class="badge bg-warning text-dark">HIGH</span>
-              {% elif sev == 'WARNING' %}
-                <span class="badge bg-info text-dark">WARNING</span>
-              {% elif sev == 'INFO' %}
-                <span class="badge bg-light text-dark border">INFO</span>
+              {% if dev.worst_severity and dev.worst_severity != '—' %}
+                {% set severity = dev.worst_severity %}
+                {% include "partials/_severity_badge.html" %}
               {% else %}
                 <span class="text-muted">—</span>
               {% endif %}

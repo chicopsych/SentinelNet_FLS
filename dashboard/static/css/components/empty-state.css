@@ -1,0 +1,8 @@
+.sn-empty-state {
+  text-align: center;
+  color: var(--bs-secondary-color);
+}
+
+.sn-empty-state .sn-empty-icon {
+  display: block;
+}

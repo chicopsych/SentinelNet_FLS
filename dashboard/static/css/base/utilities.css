@@ -1,0 +1,20 @@
+.sn-w-auto {
+  width: var(--sn-select-auto-width);
+}
+
+.sn-filter-customer {
+  width: var(--sn-filter-customer-width);
+}
+
+.sn-filter-vendor {
+  width: var(--sn-filter-vendor-width);
+}
+
+.sn-dot-icon {
+  font-size: var(--sn-dot-size);
+}
+
+.sn-pre-scroll {
+  max-height: var(--sn-payload-max-height);
+  overflow: auto;
+}

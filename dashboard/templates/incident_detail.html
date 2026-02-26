@@ -16,12 +16,12 @@
     </h1>
   </div>
   <div class="d-flex gap-2">
-    {% set badge = {'CRITICAL': 'danger', 'WARNING': 'warning', 'INFO': 'info'} %}
-    <span class="badge fs-6 bg-{{ badge.get(incident.severity, 'secondary') }}
-                 {% if incident.severity == 'WARNING' %}text-dark{% endif %}">
-      {{ incident.severity }}
-    </span>
-    <span class="badge fs-6 bg-secondary">{{ incident.status }}</span>
+    {% set severity = incident.severity %}
+    {% set size = 6 %}
+    {% include "partials/_severity_badge.html" %}
+    {% set status = incident.status %}
+    {% set size = 6 %}
+    {% include "partials/_status_badge.html" %}
   </div>
 </div>
 
@@ -94,9 +94,9 @@
       <table class="table table-sm table-bordered align-middle small mb-0">
         <thead class="table-warning text-dark">
           <tr>
-            <th style="width:30%">Parâmetro</th>
-            <th style="width:35%">Valor Esperado (Baseline)</th>
-            <th style="width:35%">Valor Atual (Capturado)</th>
+            <th class="sn-col-param">Parâmetro</th>
+            <th class="sn-col-baseline">Valor Esperado (Baseline)</th>
+            <th class="sn-col-current">Valor Atual (Capturado)</th>
           </tr>
         </thead>
         <tbody>
@@ -133,7 +133,7 @@
       <table class="table table-sm table-bordered align-middle small mb-0">
         <thead class="table-danger">
           <tr>
-            <th style="width:30%">Parâmetro</th>
+            <th class="sn-col-param">Parâmetro</th>
             <th>Valor Atual (Capturado)</th>
           </tr>
         </thead>
@@ -158,7 +158,7 @@
       <table class="table table-sm table-bordered align-middle small mb-0">
         <thead class="table-secondary">
           <tr>
-            <th style="width:30%">Parâmetro</th>
+            <th class="sn-col-param">Parâmetro</th>
             <th>Valor Esperado (Baseline)</th>
           </tr>
         </thead>
@@ -187,9 +187,12 @@
       <h6 class="text-{{ color }} mb-2">
         <i class="bi bi-{{ icon }} me-1"></i>
         Firewall — {{ label }}
-        <span class="badge bg-{{ color }} {% if color == 'warning' %}text-dark{% endif %} ms-1">
-          {{ items | length }}
+        {% set status = items | length %}
+        {% set text_dark = (color == 'warning') %}
+        <span class="ms-1">
+          {% include "partials/_status_badge.html" %}
         </span>
+        {% set text_dark = false %}
       </h6>
       <div class="table-responsive mb-4">
         <table class="table table-sm table-bordered align-middle small mb-0">
@@ -245,7 +248,7 @@
   </div>
   <div class="card-body p-0">
     {% if incident.diff_data %}
-    <pre class="m-0 p-3 small bg-light" style="max-height:320px;overflow:auto;"><code>{{ incident.diff_data | tojson(indent=2) }}</code></pre>
+    <pre class="m-0 p-3 small bg-light sn-pre-scroll"><code>{{ incident.diff_data | tojson(indent=2) }}</code></pre>
     {% else %}
     <p class="text-muted text-center py-4 mb-0">Sem payload registrado para este incidente.</p>
     {% endif %}

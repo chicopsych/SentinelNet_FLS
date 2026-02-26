@@ -12,40 +12,22 @@ Endpoints:
 from __future__ import annotations
 
 import json
-import sqlite3
 import time
-from pathlib import Path
 from typing import Any, Generator
 
 from flask import Blueprint, Response, jsonify, render_template, request, stream_with_context
 
+from dashboard.common.constants import (
+    OPEN_INCIDENT_STATUSES,
+    SSE_DEFAULT_SECONDS,
+    SSE_MAX_SECONDS,
+    SSE_MIN_SECONDS,
+)
+from dashboard.common.db import query_rows
+from dashboard.common.http import wants_json
 from inventory.customer.customer import DEVICE_INVENTORY
 
 health_bp = Blueprint("health", __name__)
-
-# Caminho do banco — mesma referência do IncidentEngine
-_DB_PATH = Path(__file__).resolve().parent.parent.parent / "inventory" / "sentinel_data.db"
-
-# Status de incidente considerado "aberto" (não resolvido)
-_OPEN_STATUSES = ("new", "em_analise")
-
-# Intervalo SSE: mínimo 5s, máximo 300s, padrão 30s
-_SSE_MIN = 5
-_SSE_MAX = 300
-_SSE_DEFAULT = 30
-
-
-# ── Queries SQLite ─────────────────────────────────────────────────────────────
-
-
-def _query_db(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
-    """Executa uma SELECT e retorna as linhas, ou [] se o banco não existir."""
-    if not _DB_PATH.exists():
-        return []
-    with sqlite3.connect(_DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        return conn.execute(sql, params).fetchall()
-
 
 def _get_overview_data() -> dict[str, Any]:
     """
@@ -57,15 +39,15 @@ def _get_overview_data() -> dict[str, Any]:
                             dispositivos com incidente aberto, últimos 5
     """
     # ── 1. Contagem de incidentes abertos por severidade ──────────────────
-    placeholders = ",".join("?" * len(_OPEN_STATUSES))
-    severity_rows = _query_db(
+    placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
+    severity_rows = query_rows(
         f"""
         SELECT UPPER(severity) AS sev, COUNT(*) AS cnt
         FROM   incidents
         WHERE  status IN ({placeholders})
         GROUP  BY UPPER(severity)
         """,
-        tuple(_OPEN_STATUSES),
+        tuple(OPEN_INCIDENT_STATUSES),
     )
 
     severity_counts: dict[str, int] = {}
@@ -79,13 +61,13 @@ def _get_overview_data() -> dict[str, Any]:
     # ── 2. Dispositivos do inventário com ≥1 incidente aberto ────────────
     devices_with_incident: set[str] = set()
     if total_open > 0:
-        rows = _query_db(
+        rows = query_rows(
             f"""
             SELECT DISTINCT device_id
             FROM   incidents
             WHERE  status IN ({placeholders})
             """,
-            tuple(_OPEN_STATUSES),
+            tuple(OPEN_INCIDENT_STATUSES),
         )
         devices_with_incident = {r["device_id"] for r in rows}
 
@@ -94,7 +76,7 @@ def _get_overview_data() -> dict[str, Any]:
     healthy        = total_devices - with_incident
 
     # ── 3. Últimos 5 incidentes abertos ──────────────────────────────────
-    recent_rows = _query_db(
+    recent_rows = query_rows(
         f"""
         SELECT id, timestamp, customer_id, device_id, severity, category, status
         FROM   incidents
@@ -102,22 +84,22 @@ def _get_overview_data() -> dict[str, Any]:
         ORDER  BY timestamp DESC
         LIMIT  5
         """,
-        tuple(_OPEN_STATUSES),
+        tuple(OPEN_INCIDENT_STATUSES),
     )
     recent_incidents = [dict(r) for r in recent_rows]
 
     # ── 4. Remediações (placeholder — sem tabela dedicada ainda) ──────────
-    approved_rows = _query_db(
+    approved_rows = query_rows(
         "SELECT COUNT(*) AS cnt FROM incidents WHERE status = 'aprovado'"
     )
-    executed_rows = _query_db(
+    executed_rows = query_rows(
         """
         SELECT COUNT(*) AS cnt FROM incidents
         WHERE  status = 'validado'
           AND  date(timestamp) = date('now')
         """
     )
-    failed_rows = _query_db(
+    failed_rows = query_rows(
         "SELECT COUNT(*) AS cnt FROM incidents WHERE status = 'falhou'"
     )
 
@@ -170,7 +152,7 @@ def overview():
     """Painel executivo com KPIs. Retorna HTML ou JSON conforme Accept header."""
     data = _get_overview_data()
 
-    if _wants_json():
+    if wants_json(request):
         return jsonify(data)
 
     return render_template("overview.html", overview=data)
@@ -191,11 +173,11 @@ def stream():
         interval (int): segundos entre eventos. Padrão 30, min 5, max 300.
     """
     try:
-        interval = int(request.args.get("interval", _SSE_DEFAULT))
+        interval = int(request.args.get("interval", SSE_DEFAULT_SECONDS))
     except (TypeError, ValueError):
-        interval = _SSE_DEFAULT
+        interval = SSE_DEFAULT_SECONDS
 
-    interval = max(_SSE_MIN, min(_SSE_MAX, interval))
+    interval = max(SSE_MIN_SECONDS, min(SSE_MAX_SECONDS, interval))
 
     return Response(
         stream_with_context(_sse_generator(interval)),
@@ -213,10 +195,3 @@ def ping():
     """Liveness check da aplicação."""
     return jsonify({"status": "ok"})
 
-
-# ── Utilitários ───────────────────────────────────────────────────────────────
-
-
-def _wants_json() -> bool:
-    best = request.accept_mimetypes.best_match(["application/json", "text/html"])
-    return best == "application/json"

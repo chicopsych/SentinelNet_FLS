@@ -16,7 +16,7 @@
     rel="stylesheet"
   />
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -71,16 +71,7 @@
   <!-- ── Conteúdo ──────────────────────────────────────────────────────── -->
   <main class="container-fluid py-4">
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar" title="Fechar"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+    {% include "partials/_flash_messages.html" %}
 
     {% block content %}{% endblock %}
 

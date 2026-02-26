@@ -1,0 +1,20 @@
+.sentinelnet-diff {
+  background-color: var(--sn-color-diff-bg);
+  color: var(--sn-color-diff-fg);
+  border-radius: 0 0 var(--sn-radius-md) var(--sn-radius-md);
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: var(--sn-font-size-code);
+  max-height: var(--sn-diff-max-height);
+  overflow-y: auto;
+  white-space: pre;
+}
+
+.sentinelnet-diff .line-add,
+.sentinelnet-diff code .add {
+  color: var(--sn-color-diff-add);
+}
+
+.sentinelnet-diff .line-remove,
+.sentinelnet-diff code .remove {
+  color: var(--sn-color-diff-remove);
+}

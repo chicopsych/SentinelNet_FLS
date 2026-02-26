@@ -10,27 +10,17 @@ Endpoints:
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, flash, jsonify, render_template, request
 
+from dashboard.common.constants import DB_PATH, OPEN_INCIDENT_STATUSES, RANK_TO_SEVERITY, SEVERITY_STATUS
+from dashboard.common.db import db_exists
+from dashboard.common.http import wants_json
 from inventory.customer.customer import DEVICE_INVENTORY
 from dashboard.services.discovery import DiscoveryError, run_nmap_discovery
 
 devices_bp = Blueprint("devices", __name__)
-
-_DB_PATH = Path(__file__).resolve().parent.parent.parent / "inventory" / "sentinel_data.db"
-_OPEN_STATUSES = ("new", "em_analise")
-
-# Mapa de severidade máxima → status visual do dispositivo
-_SEVERITY_STATUS = {
-    "CRITICAL": "critical",
-    "HIGH":     "warning",
-    "WARNING":  "warning",
-    "INFO":     "info",
-}
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -41,21 +31,23 @@ def _incidents_by_device() -> dict[str, dict[str, Any]]:
     para todos os dispositivos com incidentes abertos.
     Retorna {} se o banco não existir.
     """
-    if not _DB_PATH.exists():
+    if not db_exists():
         return {}
 
-    placeholders = ",".join("?" * len(_OPEN_STATUSES))
-    with sqlite3.connect(_DB_PATH) as conn:
+    placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             f"""
             SELECT device_id,
                    COUNT(*)         AS open_incidents,
                    MAX(CASE severity
-                       WHEN 'CRITICAL' THEN 4
-                       WHEN 'HIGH'     THEN 3
+                       WHEN 'CRITICAL' THEN 5
+                       WHEN 'HIGH'     THEN 4
+                       WHEN 'MEDIUM'   THEN 3
                        WHEN 'WARNING'  THEN 2
-                       WHEN 'INFO'     THEN 1
+                       WHEN 'LOW'      THEN 1
+                       WHEN 'INFO'     THEN 0
                        ELSE 0 END)  AS sev_rank,
                    MAX(UPPER(severity)) AS worst_sev_raw,
                    MAX(timestamp)   AS last_seen
@@ -63,7 +55,7 @@ def _incidents_by_device() -> dict[str, dict[str, Any]]:
             WHERE  status IN ({placeholders})
             GROUP  BY device_id
             """,
-            tuple(_OPEN_STATUSES),
+            tuple(OPEN_INCIDENT_STATUSES),
         ).fetchall()
 
     # Monta dict por device_id com a severidade mais alta em texto
@@ -71,12 +63,11 @@ def _incidents_by_device() -> dict[str, dict[str, Any]]:
     for r in rows:
         device_id = r["device_id"]
         # Recalcula worst_severity como string
-        rank_to_sev = {4: "CRITICAL", 3: "HIGH", 2: "WARNING", 1: "INFO", 0: "INFO"}
-        worst_sev = rank_to_sev.get(r["sev_rank"], "INFO")
+        worst_sev = RANK_TO_SEVERITY.get(r["sev_rank"], "INFO")
         result[device_id] = {
             "open_incidents": r["open_incidents"],
             "worst_severity": worst_sev,
-            "status":         _SEVERITY_STATUS.get(worst_sev, "info"),
+            "status":         SEVERITY_STATUS.get(worst_sev, "info"),
             "last_seen":      r["last_seen"],
         }
     return result
@@ -146,8 +137,7 @@ def list_devices():
     vendor   = request.args.get("vendor")
     devices  = _list_devices(customer=customer, vendor=vendor)
 
-    best = request.accept_mimetypes.best_match(["application/json", "text/html"])
-    if best == "application/json":
+    if wants_json(request):
         return jsonify({"devices": devices, "total": len(devices)})
 
     return render_template("devices.html", devices=devices, total=len(devices))
@@ -169,8 +159,7 @@ def discover_devices():
             except DiscoveryError as exc:
                 error_message = str(exc)
 
-    best = request.accept_mimetypes.best_match(["application/json", "text/html"])
-    if best == "application/json":
+    if wants_json(request):
         if error_message:
             return jsonify({"error": error_message}), 400
         if discovery is None:

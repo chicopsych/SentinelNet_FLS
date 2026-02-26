@@ -1,0 +1,9 @@
+.table th {
+  font-size: var(--sn-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sn-table-header-spacing);
+}
+
+.discover-select-col {
+  width: var(--sn-discover-select-col-width);
+}

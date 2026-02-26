@@ -1,0 +1,12 @@
+html,
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--sn-color-bg-page);
+  font-size: var(--sn-font-size-base);
+}
+
+main {
+  flex: 1;
+}

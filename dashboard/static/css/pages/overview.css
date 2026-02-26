@@ -1,0 +1,4 @@
+#stream-status .bi,
+#stream-status-icon {
+  font-size: var(--sn-dot-size);
+}

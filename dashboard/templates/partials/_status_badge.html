@@ -1,0 +1,2 @@
+{% set _status = status or '—' %}
+<span class="badge bg-{{ color or 'secondary' }}{% if text_dark %} text-dark{% endif %}{% if size %} fs-{{ size }}{% endif %}">{{ _status }}</span>

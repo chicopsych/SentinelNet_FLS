@@ -1,0 +1,14 @@
+{% set _severity = (severity or 'INFO') | upper %}
+{% if _severity == 'CRITICAL' %}
+  <span class="badge bg-danger{% if size %} fs-{{ size }}{% endif %}">CRITICAL</span>
+{% elif _severity == 'HIGH' %}
+  <span class="badge bg-warning text-dark{% if size %} fs-{{ size }}{% endif %}">HIGH</span>
+{% elif _severity == 'MEDIUM' %}
+  <span class="badge bg-primary{% if size %} fs-{{ size }}{% endif %}">MEDIUM</span>
+{% elif _severity == 'WARNING' %}
+  <span class="badge bg-info text-dark{% if size %} fs-{{ size }}{% endif %}">WARNING</span>
+{% elif _severity == 'LOW' %}
+  <span class="badge bg-light text-dark border{% if size %} fs-{{ size }}{% endif %}">LOW</span>
+{% else %}
+  <span class="badge bg-light text-dark border{% if size %} fs-{{ size }}{% endif %}">{{ _severity }}</span>
+{% endif %}

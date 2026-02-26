@@ -236,15 +236,27 @@ SentinelNet_FLS/
 │   │   ├── devices.py          # GET /devices
 │   │   ├── incidents.py        # GET /incidents
 │   │   └── remediation.py      # POST /incidents/<id>/remediation/*
+│   ├── common/                 # Helpers compartilhados (HTTP, DB, constantes)
+│   │   ├── __init__.py
+│   │   ├── constants.py
+│   │   ├── db.py
+│   │   └── http.py
 │   ├── templates/              # Templates Jinja2
 │   │   ├── base.html           # Layout base (Bootstrap 5)
 │   │   ├── overview.html       # Painel executivo KPIs
 │   │   ├── incidents.html      # Lista de incidentes
 │   │   ├── incident_detail.html# Detalhe + diff + remediação
-│   │   └── 404.html
+│   │   ├── 404.html
+│   │   └── partials/           # Fragmentos reutilizáveis (badges/alerts/empty-state)
 │   └── static/
-│       └── css/
-│           └── style.css       # Estilos customizados
+│       ├── css/
+│       │   ├── main.css        # Entrada principal de estilos
+│       │   ├── base/           # Tokens/reset/utilitários
+│       │   ├── layout/         # Navbar/footer
+│       │   ├── components/     # Badge/table/card/diff/empty-state
+│       │   └── pages/          # Ajustes por página
+│       └── js/
+│           └── overview.js     # SSE/polling da overview
 ├── utils/                      # Utilitários compartilhados
 │   └── __init__.py
 ├── main.py                     # Ponto de entrada da auditoria CLI

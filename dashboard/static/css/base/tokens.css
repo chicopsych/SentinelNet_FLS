@@ -1,0 +1,30 @@
+:root {
+  --sn-color-bg-page: #f5f6fa;
+  --sn-color-bg-surface: #ffffff;
+  --sn-color-diff-bg: #1e1e1e;
+  --sn-color-diff-fg: #d4d4d4;
+  --sn-color-diff-add: #4ec9b0;
+  --sn-color-diff-remove: #f44747;
+
+  --sn-font-size-base: 0.9rem;
+  --sn-font-size-xs: 0.78rem;
+  --sn-font-size-code: 0.8rem;
+
+  --sn-radius-md: 0.5rem;
+  --sn-space-1: 0.25rem;
+  --sn-space-2: 0.5rem;
+  --sn-space-3: 1rem;
+
+  --sn-table-header-spacing: 0.04em;
+  --sn-badge-spacing: 0.03em;
+  --sn-brand-spacing: 0.03em;
+
+  --sn-diff-max-height: 480px;
+  --sn-payload-max-height: 320px;
+
+  --sn-filter-customer-width: 160px;
+  --sn-filter-vendor-width: 140px;
+  --sn-select-auto-width: auto;
+  --sn-discover-select-col-width: 52px;
+  --sn-dot-size: 0.55rem;
+}

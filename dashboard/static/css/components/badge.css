@@ -1,0 +1,4 @@
+.badge {
+  font-weight: 600;
+  letter-spacing: var(--sn-badge-spacing);
+}
