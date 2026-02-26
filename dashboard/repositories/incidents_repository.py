@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from typing import Any
 
-from dashboard.common.constants import OPEN_INCIDENT_STATUSES, RANK_TO_SEVERITY
+from dashboard.common.constants import DB_PATH, OPEN_INCIDENT_STATUSES, RANK_TO_SEVERITY
 from dashboard.common.db import get_connection, query_rows
 
 
@@ -17,6 +18,27 @@ STATUS_UI_MAP = {
     "falhou": "falhou",
     "revertido": "revertido",
 }
+
+
+def ensure_incidents_table() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS incidents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                customer_id TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                category TEXT NOT NULL,
+                description TEXT,
+                payload_json TEXT,
+                status TEXT DEFAULT 'new'
+            )
+            """
+        )
+        conn.commit()
 
 
 def normalize_status(status: str | None) -> str:
@@ -102,6 +124,7 @@ def list_incidents(
     page: int = 1,
     page_size: int = 25,
 ) -> tuple[list[dict[str, Any]], int]:
+    ensure_incidents_table()
     conn = get_connection()
     if conn is None:
         return [], 0
@@ -191,6 +214,7 @@ def list_incidents(
 
 
 def get_incident(incident_id: int) -> dict[str, Any] | None:
+    ensure_incidents_table()
     conn = get_connection()
     if conn is None:
         return None
@@ -211,6 +235,7 @@ def get_incident(incident_id: int) -> dict[str, Any] | None:
 
 
 def count_open_by_severity() -> dict[str, int]:
+    ensure_incidents_table()
     placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
     rows = query_rows(
         f"""
@@ -230,6 +255,7 @@ def count_open_total() -> int:
 
 
 def list_distinct_open_devices() -> set[str]:
+    ensure_incidents_table()
     placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
     rows = query_rows(
         f"""
@@ -243,6 +269,7 @@ def list_distinct_open_devices() -> set[str]:
 
 
 def list_recent_open(limit: int = 5) -> list[dict[str, Any]]:
+    ensure_incidents_table()
     placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
     rows = query_rows(
         f"""
@@ -258,11 +285,13 @@ def list_recent_open(limit: int = 5) -> list[dict[str, Any]]:
 
 
 def count_by_status(status: str) -> int:
+    ensure_incidents_table()
     rows = query_rows("SELECT COUNT(*) AS cnt FROM incidents WHERE status = ?", (status,))
     return rows[0]["cnt"] if rows else 0
 
 
 def count_validated_today() -> int:
+    ensure_incidents_table()
     rows = query_rows(
         """
         SELECT COUNT(*) AS cnt FROM incidents
@@ -274,6 +303,7 @@ def count_validated_today() -> int:
 
 
 def list_open_summary_by_device() -> dict[str, dict[str, Any]]:
+    ensure_incidents_table()
     placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
     rows = query_rows(
         f"""
@@ -307,6 +337,7 @@ def list_open_summary_by_device() -> dict[str, dict[str, Any]]:
 
 
 def list_distinct_severities() -> list[str]:
+    ensure_incidents_table()
     rows = query_rows(
         """
         SELECT DISTINCT UPPER(severity) AS sev
@@ -330,6 +361,7 @@ def list_distinct_severities() -> list[str]:
 
 
 def list_distinct_statuses() -> list[str]:
+    ensure_incidents_table()
     rows = query_rows(
         """
         SELECT DISTINCT LOWER(status) AS st
