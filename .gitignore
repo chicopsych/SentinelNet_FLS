@@ -69,3 +69,6 @@ Thumbs.db
 # Project temp files
 *.tmp
 *.bak
+
+# Database files
+*.db
