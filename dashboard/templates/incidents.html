@@ -111,6 +111,92 @@
   </div>
 </form>
 
+{% set has_active_filters =
+  (filters.customer or filters.device_id or filters.vendor or filters.severity or
+  filters.min_severity or filters.status or filters.start_date or filters.end_date or
+  ((filters.sort or 'newest') != 'newest'))
+%}
+
+{% set status_chip_labels = {
+  'new': 'Novo',
+  'novo': 'Novo',
+  'em_analise': 'Em análise',
+  'aprovado': 'Aprovado',
+  'executado': 'Executado',
+  'validado': 'Validado',
+  'falhou': 'Falhou',
+  'revertido': 'Revertido'
+} %}
+
+{% set sort_chip_labels = {
+  'newest': 'Mais recentes',
+  'oldest': 'Mais antigos',
+  'severity_desc': 'Severidade (maior)',
+  'severity_asc': 'Severidade (menor)'
+} %}
+
+{% if has_active_filters %}
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <span class="small text-muted">Filtros ativos:</span>
+
+  {% if filters.customer %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer='', device_id=base_query.device_id, vendor=base_query.vendor, severity=base_query.severity, min_severity=base_query.min_severity, status=base_query.status, start_date=base_query.start_date, end_date=base_query.end_date, sort=base_query.sort) }}"
+    title="Remover filtro de cliente">Cliente: {{ filters.customer }} ×</a>
+  {% endif %}
+
+  {% if filters.device_id %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer=base_query.customer, device_id='', vendor=base_query.vendor, severity=base_query.severity, min_severity=base_query.min_severity, status=base_query.status, start_date=base_query.start_date, end_date=base_query.end_date, sort=base_query.sort) }}"
+    title="Remover filtro de dispositivo">Dispositivo: {{ filters.device_id }} ×</a>
+  {% endif %}
+
+  {% if filters.vendor %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer=base_query.customer, device_id=base_query.device_id, vendor='', severity=base_query.severity, min_severity=base_query.min_severity, status=base_query.status, start_date=base_query.start_date, end_date=base_query.end_date, sort=base_query.sort) }}"
+    title="Remover filtro de vendor">Vendor: {{ filters.vendor }} ×</a>
+  {% endif %}
+
+  {% if filters.severity %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer=base_query.customer, device_id=base_query.device_id, vendor=base_query.vendor, severity='', min_severity=base_query.min_severity, status=base_query.status, start_date=base_query.start_date, end_date=base_query.end_date, sort=base_query.sort) }}"
+    title="Remover filtro de severidade">Severidade: {{ filters.severity }} ×</a>
+  {% endif %}
+
+  {% if filters.min_severity %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer=base_query.customer, device_id=base_query.device_id, vendor=base_query.vendor, severity=base_query.severity, min_severity='', status=base_query.status, start_date=base_query.start_date, end_date=base_query.end_date, sort=base_query.sort) }}"
+    title="Remover filtro de severidade mínima">Sev. mínima: {{ filters.min_severity }} ×</a>
+  {% endif %}
+
+  {% if filters.status %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer=base_query.customer, device_id=base_query.device_id, vendor=base_query.vendor, severity=base_query.severity, min_severity=base_query.min_severity, status='', start_date=base_query.start_date, end_date=base_query.end_date, sort=base_query.sort) }}"
+      title="Remover filtro de status">Status: {{ status_chip_labels.get(filters.status, filters.status) }} ×</a>
+  {% endif %}
+
+  {% if filters.start_date %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer=base_query.customer, device_id=base_query.device_id, vendor=base_query.vendor, severity=base_query.severity, min_severity=base_query.min_severity, status=base_query.status, start_date='', end_date=base_query.end_date, sort=base_query.sort) }}"
+    title="Remover data inicial">Início: {{ filters.start_date }} ×</a>
+  {% endif %}
+
+  {% if filters.end_date %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer=base_query.customer, device_id=base_query.device_id, vendor=base_query.vendor, severity=base_query.severity, min_severity=base_query.min_severity, status=base_query.status, start_date=base_query.start_date, end_date='', sort=base_query.sort) }}"
+    title="Remover data final">Fim: {{ filters.end_date }} ×</a>
+  {% endif %}
+
+  {% if (filters.sort or 'newest') != 'newest' %}
+  <a class="badge rounded-pill text-bg-light text-decoration-none"
+    href="{{ url_for('incidents.list_incidents', page=1, customer=base_query.customer, device_id=base_query.device_id, vendor=base_query.vendor, severity=base_query.severity, min_severity=base_query.min_severity, status=base_query.status, start_date=base_query.start_date, end_date=base_query.end_date, sort='newest') }}"
+      title="Remover ordenação customizada">Ordenação: {{ sort_chip_labels.get(filters.sort, filters.sort) }} ×</a>
+  {% endif %}
+
+  <a class="small text-decoration-none ms-1" href="{{ url_for('incidents.list_incidents') }}">Limpar tudo</a>
+</div>
+{% endif %}
+
 <!-- ── Tabela ──────────────────────────────────────────────────────────── -->
 {% if incidents %}
 <div class="table-responsive">
