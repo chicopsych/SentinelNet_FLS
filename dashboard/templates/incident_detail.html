@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Incidente {{ incident.id }} — SentinelNet{% endblock %}
+
+{% block content %}
+
+<!-- ── Cabeçalho ───────────────────────────────────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <a href="{{ url_for('incidents.list_incidents') }}" class="text-muted small">
+      <i class="bi bi-arrow-left me-1"></i>Voltar aos incidentes
+    </a>
+    <h1 class="h4 mt-1 mb-0">
+      Incidente
+      <span class="font-monospace text-muted">{{ incident.id }}</span>
+    </h1>
+  </div>
+  <div class="d-flex gap-2">
+    {% set badge = {'CRITICAL': 'danger', 'WARNING': 'warning', 'INFO': 'info'} %}
+    <span class="badge fs-6 bg-{{ badge.get(incident.severity, 'secondary') }}
+                 {% if incident.severity == 'WARNING' %}text-dark{% endif %}">
+      {{ incident.severity }}
+    </span>
+    <span class="badge fs-6 bg-secondary">{{ incident.status }}</span>
+  </div>
+</div>
+
+<!-- ── Metadados ───────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1"><i class="bi bi-router me-1"></i>Dispositivo</p>
+        <p class="fw-semibold mb-0">{{ incident.device }}</p>
+        <p class="text-muted small mb-0">{{ incident.vendor }} — {{ incident.site }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1"><i class="bi bi-person me-1"></i>Cliente</p>
+        <p class="fw-semibold mb-0">{{ incident.customer }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1"><i class="bi bi-clock me-1"></i>Detectado em</p>
+        <p class="fw-semibold mb-0">{{ incident.detected_at }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1"><i class="bi bi-tag me-1"></i>Tipo</p>
+        <p class="fw-semibold mb-0">{{ incident.type }}</p>
+        <p class="text-muted small mb-0">{{ incident.cause }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Diff Baseline x Atual ──────────────────────────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">
+    <i class="bi bi-file-diff me-1 text-warning"></i>Diff — Baseline vs Estado Atual
+  </div>
+  <div class="card-body p-0">
+    {% if incident.diff %}
+    <pre class="sentinelnet-diff m-0 p-3"><code>{{ incident.diff }}</code></pre>
+    {% else %}
+    <p class="text-muted text-center py-4 mb-0">Diff não disponível para este incidente.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Evidência Técnica ───────────────────────────────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">
+    <i class="bi bi-terminal me-1 text-secondary"></i>Evidência Técnica
+  </div>
+  <div class="card-body p-0">
+    {% if incident.evidence %}
+    <pre class="m-0 p-3 small bg-light"><code>{{ incident.evidence }}</code></pre>
+    {% else %}
+    <p class="text-muted text-center py-4 mb-0">Sem evidência técnica registrada.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Remediação ─────────────────────────────────────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-wrench me-1 text-primary"></i>Remediação</span>
+    {% if incident.status in ['novo', 'em_analise'] %}
+    <button
+      class="btn btn-sm btn-outline-primary"
+      hx-post="{{ url_for('remediation.suggest', incident_id=incident.id) }}"
+      hx-swap="outerHTML"
+    >
+      <i class="bi bi-magic me-1"></i>Gerar sugestão
+    </button>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if incident.remediation %}
+    <ul class="list-group list-group-flush">
+      {% for cmd in incident.remediation.commands %}
+      <li class="list-group-item font-monospace small">{{ cmd }}</li>
+      {% endfor %}
+    </ul>
+    <div class="d-flex gap-2 mt-3">
+      {% if incident.remediation.status == 'em_analise' %}
+      <form method="post"
+            action="{{ url_for('remediation.approve', incident_id=incident.id) }}">
+        <button type="submit" class="btn btn-success btn-sm">
+          <i class="bi bi-check-lg me-1"></i>Aprovar
+        </button>
+      </form>
+      {% endif %}
+      {% if incident.remediation.status == 'aprovado' %}
+      <form method="post"
+            action="{{ url_for('remediation.execute', incident_id=incident.id) }}">
+        <input type="hidden" name="dry_run" value="true" />
+        <button type="submit" class="btn btn-outline-warning btn-sm">
+          <i class="bi bi-play me-1"></i>Dry Run
+        </button>
+      </form>
+      <form method="post"
+            action="{{ url_for('remediation.execute', incident_id=incident.id) }}">
+        <input type="hidden" name="dry_run" value="false" />
+        <button type="submit" class="btn btn-danger btn-sm">
+          <i class="bi bi-lightning me-1"></i>Executar
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted mb-0 text-center py-3">
+      Nenhuma sugestão de remediação gerada ainda.
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Histórico de Ações ─────────────────────────────────────────────── -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white fw-semibold">
+    <i class="bi bi-clock-history me-1 text-secondary"></i>Histórico de Ações
+  </div>
+  <div class="card-body">
+    {% if incident.history %}
+    <ul class="list-unstyled mb-0">
+      {% for entry in incident.history %}
+      <li class="d-flex gap-3 mb-2">
+        <span class="text-muted small text-nowrap">{{ entry.timestamp }}</span>
+        <span class="small">
+          <strong>{{ entry.actor }}</strong> — {{ entry.action }}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0 text-center py-3">Nenhuma ação registrada.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

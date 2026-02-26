@@ -95,6 +95,7 @@ O projeto segue o padrão **Strategy**, mantendo o núcleo desacoplado das parti
 - **Netmiko** (coleta via SSH)
 - **TTP / TextFSM** (parsing)
 - **Pydantic** (validação de schema)
+- **Flask** (API e backend do dashboard)
 - **SQLite** (opcional para histórico)
 - **Logging nativo do Python + RotatingFileHandler** (observabilidade básica)
 
@@ -128,9 +129,30 @@ SentinelNet_FLS/
 │   ├── __init__.py
 │   ├── mikrotik_firewall.ttp
 │   └── mikrotik_routes.ttp
+├── dashboard/                  # Dashboard Flask (API + frontend)
+│   ├── __init__.py             # App Factory (create_app)
+│   ├── config.py               # Configurações por ambiente
+│   ├── extensions.py           # Extensões Flask compartilhadas
+│   ├── blueprints/             # Módulos de rotas por domínio
+│   │   ├── __init__.py
+│   │   ├── auth.py             # Autenticação por token
+│   │   ├── health.py           # GET /health/overview
+│   │   ├── devices.py          # GET /devices
+│   │   ├── incidents.py        # GET /incidents
+│   │   └── remediation.py      # POST /incidents/<id>/remediation/*
+│   ├── templates/              # Templates Jinja2
+│   │   ├── base.html           # Layout base (Bootstrap 5)
+│   │   ├── overview.html       # Painel executivo KPIs
+│   │   ├── incidents.html      # Lista de incidentes
+│   │   ├── incident_detail.html# Detalhe + diff + remediação
+│   │   └── 404.html
+│   └── static/
+│       └── css/
+│           └── style.css       # Estilos customizados
 ├── utils/                      # Utilitários compartilhados
 │   └── __init__.py
-├── main.py                     # Ponto de entrada da aplicação
+├── main.py                     # Ponto de entrada da auditoria CLI
+├── run.py                      # Ponto de entrada do dashboard Flask
 └── requirements.txt            # Dependências do projeto
 ```
 
@@ -158,8 +180,12 @@ source venv/bin/activate
 # 2) Instalar dependências
 pip install -r requirements.txt
 
-# 3) Executar auditoria (exemplo)
+# 3) Executar auditoria CLI (exemplo)
 python main.py
+
+# 4) Iniciar o dashboard Flask (desenvolvimento)
+python run.py
+# Acesse: http://127.0.0.1:5000/health/overview
 ```
 
 ### Pré-requisitos
@@ -259,21 +285,113 @@ Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricant
 
 O projeto está sendo construído com foco em interoperabilidade com agentes de IA. A estrutura de dados em JSON e a validação via Pydantic permitem que o SentinelNet_FLS atue como um **provedor de contexto para LLMs** através do protocolo **MCP (Model Context Protocol)** e orquestradores como o **OpenClaw**.
 
-### Plano de Implementação
+### Plano de Implementação do Dashboard (Monitoramento + Correção)
 
-#### 1. Exposição como MCP Server
+Objetivo: implementar um dashboard operacional completo para **detectar, priorizar e corrigir** erros de configuração e falhas de dispositivos de rede com rastreabilidade fim a fim.
 
-Criar um wrapper que transforma as funções de auditoria em ferramentas (*tools*) consumíveis por agentes de IA, permitindo que solicitem auditorias em tempo real via comandos de voz ou chat.
+#### Fase 1 — Fundamentos de Dados e Telemetria
 
-#### 2. Análise de Desvio Assistida (AI Drift Analysis)
+1. Consolidar um modelo único de eventos (`drift`, `falha de coleta`, `erro de parsing`, `falha de autenticação`, `inconsistência de baseline`).
+2. Padronizar severidade (`INFO`, `WARNING`, `CRITICAL`) e incluir metadados mínimos: cliente, site, dispositivo, vendor, timestamp, causa provável e impacto.
+3. Persistir eventos em armazenamento consultável (SQLite no MVP) com histórico e trilha de auditoria.
+4. Definir janelas de retenção e rotação para dados operacionais e evidências.
 
-Enviar o diferencial (diff) gerado pelo sistema para o OpenClaw para interpretação semântica.
+**Entregáveis da Fase 1**
 
-> **Exemplo:** *"A IA identifica que a alteração na regra de firewall X abre uma vulnerabilidade para o serviço de banco de dados do cliente."*
+- Tabela/coleção de eventos operacionais
+- Contrato JSON versionado para eventos e status de remediação
+- Camada de consulta pronta para alimentar API do dashboard
 
-#### 3. Remediação Sugerida
+#### Fase 2 — API de Observabilidade e Orquestração (Flask)
 
-Utilizar modelos de linguagem para sugerir os comandos CLI exatos necessários para retornar o equipamento ao estado da Baseline, com base nos desvios detectados.
+1. Criar endpoints para visão operacional:
+   - `GET /health/overview` (saúde geral)
+   - `GET /devices` (estado por dispositivo)
+   - `GET /incidents` (lista e filtro de incidentes)
+   - `GET /incidents/{id}` (detalhes + evidências)
+2. Implementar endpoint de ação corretiva assistida:
+   - `POST /incidents/{id}/remediation/suggest`
+   - `POST /incidents/{id}/remediation/approve`
+   - `POST /incidents/{id}/remediation/execute` (modo controlado)
+3. Garantir RBAC mínimo (operador, revisor, admin) e trilha de aprovação para ações sensíveis.
+4. Incluir rate limit e autenticação por token para integração segura.
+5. Estruturar backend em Flask com Blueprints separados por domínio (health, devices, incidents, remediation, auth).
+
+**Entregáveis da Fase 2**
+
+- API REST documentada para consumo do dashboard
+- Fluxo de aprovação de remediação com auditoria
+- Contratos de erro padronizados para troubleshooting
+
+#### Fase 3 — Dashboard Web em Flask (Operação em Tempo Real)
+
+1. Implementar painel executivo com KPIs:
+   - Dispositivos saudáveis x com incidente
+   - Incidentes por severidade
+   - Top 10 causas recorrentes
+   - MTTA e MTTR
+2. Implementar visão de incidentes com filtros por cliente, site, vendor, severidade, status e período.
+3. Implementar página de detalhe do incidente com:
+   - Diff baseline x atual
+   - Evidência técnica (trechos de config/log)
+   - Sugestão de remediação
+   - Histórico de ações e aprovações
+4. Implementar fila de remediação com estados: `novo`, `em análise`, `aprovado`, `executado`, `falhou`, `revertido`.
+5. Implementar frontend inicial com templates server-side (Jinja2) para acelerar o MVP.
+
+**Entregáveis da Fase 3**
+
+- Interface web funcional para NOC/SOC
+- Navegação por cliente e ativo com drill-down
+- Linha do tempo de incidentes e remediações
+
+#### Fase 4 — Motor de Correção Segura
+
+1. Implementar geração de comandos corretivos (rule-based + IA opcional).
+2. Validar comandos por *allowlist* e políticas de segurança antes da execução.
+3. Suportar modo `dry-run` obrigatório no MVP para simulação de impacto.
+4. Executar remediação em janela controlada com rollback pré-definido.
+5. Recoletar snapshot após execução para confirmar convergência com a baseline.
+
+**Entregáveis da Fase 4**
+
+- Pipeline de remediação com validação e rollback
+- Evidência automática de sucesso/falha pós-ação
+- Política de bloqueio para comandos de alto risco
+
+#### Fase 5 — Alertas, SLOs e Governança
+
+1. Integrar alertas (e-mail/Slack/Webhook) para incidentes `CRITICAL` e falhas repetidas.
+2. Definir SLOs operacionais:
+   - Detecção de drift crítico em até 5 min
+   - Geração de sugestão de correção em até 2 min
+   - Atualização de status em tempo quase real
+3. Implementar relatórios executivos e técnicos por período e por cliente.
+4. Estabelecer processo de revisão pós-incidente (RCA) para redução de recorrência.
+
+**Entregáveis da Fase 5**
+
+- Matriz de alertas por severidade e canal
+- Painel de SLO com tendências
+- Relatórios mensais de conformidade e estabilidade
+
+#### Backlog Técnico Prioritário (MVP Dashboard)
+
+1. Criar módulo `core/incident_engine.py` para consolidar eventos em incidentes.
+2. Evoluir `core/report_manager.py` para saída operacional consumível por API.
+3. Adicionar persistência de incidentes e ações (`core/audit_report.py` + camada de repositório).
+4. Criar serviço de remediação controlada (`core/remediation_service.py`).
+5. Expor API Flask (`api/`) para dashboard com autenticação e filtros.
+6. Criar frontend Flask (`dashboard/`) com telas de overview, lista e detalhe de incidente.
+7. Incluir testes de integração para fluxo completo: detecção → sugestão → aprovação → execução → validação.
+
+#### Critérios de Aceite do Dashboard
+
+- Incidente crítico aparece no dashboard em até 1 ciclo de auditoria.
+- Operador consegue identificar causa, impacto e ação sugerida sem acesso ao host.
+- Remediação exige aprovação quando severidade for `CRITICAL`.
+- Toda ação corretiva gera trilha de auditoria e evidência pós-execução.
+- Sistema registra falhas de correção sem interromper o pipeline de monitoramento.
 
 ## ✅ Critérios de Sucesso (MVP)
 

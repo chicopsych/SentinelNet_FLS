@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Incidentes — SentinelNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h4 mb-0">
+    <i class="bi bi-exclamation-triangle me-2 text-danger"></i>Incidentes
+  </h1>
+</div>
+
+<!-- ── Filtros ─────────────────────────────────────────────────────────── -->
+<form method="get" class="row g-2 mb-4 align-items-end">
+  <div class="col-sm-3">
+    <label class="form-label small text-muted mb-1">Cliente</label>
+    <input
+      type="text"
+      name="customer"
+      class="form-control form-control-sm"
+      placeholder="ex: cliente-a"
+      value="{{ filters.customer or '' }}"
+    />
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small text-muted mb-1">Severidade</label>
+    <select name="severity" class="form-select form-select-sm">
+      <option value="">Todas</option>
+      <option value="CRITICAL" {% if filters.severity == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+      <option value="WARNING"  {% if filters.severity == 'WARNING'  %}selected{% endif %}>WARNING</option>
+      <option value="INFO"     {% if filters.severity == 'INFO'     %}selected{% endif %}>INFO</option>
+    </select>
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small text-muted mb-1">Status</label>
+    <select name="status" class="form-select form-select-sm">
+      <option value="">Todos</option>
+      <option value="novo"        {% if filters.status == 'novo'        %}selected{% endif %}>Novo</option>
+      <option value="em_analise"  {% if filters.status == 'em_analise'  %}selected{% endif %}>Em análise</option>
+      <option value="aprovado"    {% if filters.status == 'aprovado'    %}selected{% endif %}>Aprovado</option>
+      <option value="executado"   {% if filters.status == 'executado'   %}selected{% endif %}>Executado</option>
+      <option value="validado"    {% if filters.status == 'validado'    %}selected{% endif %}>Validado</option>
+      <option value="falhou"      {% if filters.status == 'falhou'      %}selected{% endif %}>Falhou</option>
+    </select>
+  </div>
+  <div class="col-sm-auto">
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-funnel me-1"></i>Filtrar
+    </button>
+    <a href="{{ url_for('incidents.list_incidents') }}" class="btn btn-sm btn-outline-secondary ms-1">
+      Limpar
+    </a>
+  </div>
+</form>
+
+<!-- ── Tabela ──────────────────────────────────────────────────────────── -->
+{% if incidents %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle small">
+    <thead class="table-dark">
+      <tr>
+        <th>ID</th>
+        <th>Dispositivo</th>
+        <th>Cliente</th>
+        <th>Vendor</th>
+        <th>Severidade</th>
+        <th>Tipo</th>
+        <th>Status</th>
+        <th>Detectado em</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inc in incidents %}
+      <tr>
+        <td class="font-monospace text-muted">{{ inc.id }}</td>
+        <td>{{ inc.device }}</td>
+        <td>{{ inc.customer }}</td>
+        <td>{{ inc.vendor }}</td>
+        <td>
+          {% set badge = {'CRITICAL': 'danger', 'WARNING': 'warning', 'INFO': 'info'} %}
+          <span class="badge bg-{{ badge.get(inc.severity, 'secondary') }}
+                       {% if inc.severity == 'WARNING' %}text-dark{% endif %}">
+            {{ inc.severity }}
+          </span>
+        </td>
+        <td>{{ inc.type }}</td>
+        <td><span class="badge bg-secondary">{{ inc.status }}</span></td>
+        <td class="text-muted">{{ inc.detected_at }}</td>
+        <td>
+          <a href="{{ url_for('incidents.get_incident', incident_id=inc.id) }}"
+             class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-eye"></i>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Paginação simples -->
+<nav>
+  <ul class="pagination pagination-sm justify-content-end">
+    {% if page > 1 %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page - 1 }}">Anterior</a>
+    </li>
+    {% endif %}
+    <li class="page-item active"><span class="page-link">{{ page }}</span></li>
+    {% if incidents|length == 25 %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page + 1 }}">Próxima</a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+  <p class="mb-0">Nenhum incidente encontrado para os filtros selecionados.</p>
+</div>
+{% endif %}
+
+{% endblock %}
