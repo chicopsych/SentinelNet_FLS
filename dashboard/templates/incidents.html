@@ -89,8 +89,9 @@
         <td>
           <a href="{{ url_for('incidents.get_incident', incident_id=inc.id) }}"
              class="btn btn-sm btn-outline-primary"
-             title="Visualizar incidente">
-            <i class="bi bi-eye"></i>
+             title="Visualizar incidente"
+             aria-label="Ver detalhes do incidente {{ inc.id }}">
+            <i class="bi bi-eye" aria-hidden="true"></i>
           </a>
         </td>
       </tr>
@@ -100,12 +101,12 @@
 </div>
 
 <!-- Paginação simples -->
-<nav>
+<nav aria-label="Navegação de páginas de incidentes">
   <ul class="pagination pagination-sm justify-content-end">
     {% if page > 1 %}
-    <li class="page-item"><a class="page-link" href="?page={{ page - 1 }}">Anterior</a></li>
+    <li class="page-item"><a class="page-link" href="?page={{ page - 1 }}" aria-label="Página anterior">Anterior</a></li>
     {% endif %}
-    <li class="page-item active"><span class="page-link">{{ page }}</span></li>
+    <li class="page-item active" aria-current="page"><span class="page-link">{{ page }}</span></li>
     {% if incidents|length == 25 %}
     <li class="page-item"><a class="page-link" href="?page={{ page + 1 }}">Próxima</a></li>
     {% endif %}

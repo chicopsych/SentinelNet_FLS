@@ -40,19 +40,22 @@
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item">
             <a class="nav-link {% if request.endpoint == 'health.overview' %}active{% endif %}"
-               href="{{ url_for('health.overview') }}">
+               href="{{ url_for('health.overview') }}"
+               {% if request.endpoint == 'health.overview' %}aria-current="page"{% endif %}>
               <i class="bi bi-speedometer2 me-1"></i>Overview
             </a>
           </li>
           <li class="nav-item">
             <a class="nav-link {% if request.blueprint == 'incidents' %}active{% endif %}"
-               href="{{ url_for('incidents.list_incidents') }}">
+               href="{{ url_for('incidents.list_incidents') }}"
+               {% if request.blueprint == 'incidents' %}aria-current="page"{% endif %}>
               <i class="bi bi-exclamation-triangle me-1"></i>Incidentes
             </a>
           </li>
           <li class="nav-item">
             <a class="nav-link {% if request.blueprint == 'devices' %}active{% endif %}"
-               href="{{ url_for('devices.list_devices') }}">
+               href="{{ url_for('devices.list_devices') }}"
+               {% if request.blueprint == 'devices' %}aria-current="page"{% endif %}>
               <i class="bi bi-router me-1"></i>Dispositivos
             </a>
           </li>
