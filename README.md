@@ -16,6 +16,54 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 
 ---
 
+## 📊 Status Atual do Projeto (26/02/2026)
+
+### Resumo executivo
+
+- **Maturidade atual:** MVP técnico funcional (CLI + Dashboard Flask inicial)
+- **Coleta de dados de rede:** implementada para MikroTik
+- **Detecção de drift:** implementada e demonstrada via fluxo de exemplo no `main.py`
+- **Relatórios de auditoria:** persistência em JSON, HTML e SQLite implementada
+- **Dashboard Flask:** estrutura base pronta (app factory, blueprints e templates)
+- **Próximo marco principal:** integrar pipeline real inventário → driver → diff → incidentes para abastecer o dashboard com dados de produção
+
+### Semáforo de andamento
+
+- 🟢 **Concluído:** schema, driver base, diff engine, report manager, cofre de credenciais, esqueleto Flask
+- 🟡 **Em progresso:** integração ponta a ponta do fluxo de auditoria com dados reais no dashboard
+- 🔴 **Não iniciado:** MCP Server, análise IA de drift, remediação IA com execução controlada
+
+### 📈 Progresso percentual por Task (estimativa)
+
+| Task | Escopo | Status | Progresso |
+| --- | --- | --- | ---: |
+| 01 | Schema JSON (Pydantic) | ✅ Concluído | 100% |
+| 02 | Driver Base Abstrato | ✅ Concluído | 100% |
+| 03 | Driver MikroTik (MVP) | 🟡 Parcial | 80% |
+| 04 | Parsing TTP (MVP) | 🟡 Parcial | 60% |
+| 05 | Diff Engine | ✅ Concluído | 100% |
+| 06 | Relatório + Logging | ✅ Concluído | 100% |
+| 07 | Gestão de Credenciais | ✅ Concluído | 100% |
+| 08 | Exposição MCP Server | 🔴 Não iniciado | 0% |
+| 09 | AI Drift Analysis | 🔴 Não iniciado | 0% |
+| 10 | Remediação por IA | 🔴 Não iniciado | 0% |
+
+## Progresso geral do roadmap (10 tasks): ~64%
+
+### 📈 Progresso percentual por Fase do Dashboard (estimativa)
+
+| Fase | Escopo | Status | Progresso |
+| --- | --- | --- | ---: |
+| Fase 1 | Fundamentos de dados e telemetria | 🟡 Parcial | 55% |
+| Fase 2 | API de observabilidade (Flask) | 🟡 Parcial | 45% |
+| Fase 3 | Dashboard web em Flask | 🟡 Parcial | 40% |
+| Fase 4 | Motor de correção segura | 🔴 Não iniciado | 0% |
+| Fase 5 | Alertas, SLOs e governança | 🔴 Não iniciado | 0% |
+
+### Progresso geral do dashboard (5 fases): ~28%
+
+---
+
 ## 🎯 Objetivos do Projeto
 
 - Garantir a **integridade configuracional** dos ativos de rede
@@ -36,11 +84,48 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
 
 ### ✅ Implementações já concluídas
 
-- **Schema de configuração (Pydantic):** modelos completos em `core/schemas.py` para interfaces, rotas, regras de firewall e `DeviceConfig`.
-- **Driver base abstrato:** contrato comum e suporte a context manager em `core/base_driver.py`.
-- **Driver MikroTik (MVP inicial):** conexão SSH via Netmiko, coleta com `/export verbose`, parsing de cabeçalho e montagem de `DeviceConfig` em `drivers/mikrotik_driver.py`.
-- **Parsing TTP para MikroTik:** templates para rotas e firewall em `templates/mikrotik_routes.ttp` e `templates/mikrotik_firewall.ttp`.
-- **Logging interno centralizado:** `internalloggin/logger.py` com `RotatingFileHandler`, integração ativa no `main.py`, `core/base_driver.py` e `inventory/customer/customer.py`.
+- **Core / Modelagem (`core/schemas.py`)**
+  - Modelos Pydantic completos para `DeviceConfig`, `Interface`, `Route` e `FirewallRule`
+  - Validação estrutural padronizada para entrada/saída de snapshots
+
+- **Driver Abstrato (`core/base_driver.py`)**
+  - Contrato padrão para vendors (`connect`, `get_config_snapshot`, `disconnect`)
+  - Context manager implementado para garantir encerramento de sessão
+
+- **Driver MikroTik (`drivers/mikrotik_driver.py`)**
+  - Conexão SSH com Netmiko
+  - Coleta `/export verbose`
+  - Parse de metadados (hostname/model/version)
+  - Parse de rotas e firewall com templates TTP
+  - Factory `from_vault(...)` para uso com cofre criptografado
+
+- **Diff Engine (`core/diff_engine.py`)**
+  - Comparação baseline × current para campos escalares e listas
+  - Auditoria especializada de firewall com:
+    - `position_drift`
+    - `parameter_drift`
+    - `missing_rules`
+    - `extra_rules`
+
+- **Auditoria e Persistência (`core/audit_report.py` + `core/report_manager.py`)**
+  - Classificação automática de severidade (`COMPLIANT` → `CRITICAL`)
+  - Persistência simultânea em JSON + HTML + SQLite
+  - Consulta de histórico e estatísticas agregadas
+
+- **Segurança de Credenciais (`utils/vault.py` + `utils/vault_setup.py`)**
+  - Cofre criptografado com Fernet
+  - Master key via variável `SENTINEL_MASTER_KEY`
+  - CLI utilitário para gerar chave e gerenciar credenciais
+
+- **Observabilidade (`internalloggin/logger.py`)**
+  - Logging central com `RotatingFileHandler`
+  - Integração em módulos centrais e fluxo de demonstração
+
+- **Dashboard Flask (`dashboard/` + `run.py`)**
+  - App Factory (`create_app`)
+  - Blueprints de `auth`, `health`, `devices`, `incidents`, `remediation`
+  - Templates base com Bootstrap 5 + páginas de overview/incidentes
+  - Rota raiz `/` redirecionando para `/health/overview`
 
 ---
 
@@ -195,6 +280,21 @@ python run.py
 - Baseline JSON definido para os ativos auditados
 - Templates de parsing compatíveis com o firmware/versão dos equipamentos
 
+### Endpoints disponíveis no Dashboard Flask (estado atual)
+
+> Alguns endpoints ainda retornam dados mockados (estrutura pronta para integração com repositório real de incidentes).
+
+- `GET /` → redireciona para overview
+- `GET /health/ping` → healthcheck simples
+- `GET /health/overview` → overview (HTML/JSON)
+- `GET /devices/` e `GET /devices/<device_id>`
+- `GET /incidents/` e `GET /incidents/<incident_id>`
+- `GET /auth/verify` (protegido por token)
+- `POST /incidents/<incident_id>/remediation/suggest` (token)
+- `POST /incidents/<incident_id>/remediation/approve` (token)
+- `POST /incidents/<incident_id>/remediation/execute` (token)
+- `GET /incidents/<incident_id>/remediation/status` (token)
+
 ---
 
 ## 📌 Escopo Inicial (MVP)
@@ -211,73 +311,52 @@ Para garantir entregas rápidas e validar valor cedo, o MVP pode focar em:
 
 ## 🛠️ Roadmap de Execução (Task List)
 
-Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricante.
+Esta sequência prioriza base sólida antes de aumentar o escopo multi-fabricante e IA.
 
-1. [x] **Task 01: Definição do Schema JSON** ✅
-   - Modelar entidades (interfaces, rotas, firewall, usuários) com `Pydantic`
-   - Definir validações mínimas e campos obrigatórios
-   - **Entregável:** `core/schemas.py` — modelos `Interface`, `Route`, `FirewallRule`, `DeviceConfig`
+1. [x] **Task 01: Definição do Schema JSON**
+   - ✅ Implementada em `core/schemas.py`
 
-2. [x] **Task 02: Implementação da Classe Abstrata (Driver Base)** ✅
-   - Criar contrato comum (`connect`, `get_config_snapshot`, `disconnect`)
-   - Padronizar erros e retorno de dados
-   - **Entregável:** `core/base_driver.py` — classe `NetworkDeviceDriver(ABC)` com context manager
+2. [x] **Task 02: Implementação da Classe Abstrata (Driver Base)**
+   - ✅ Implementada em `core/base_driver.py`
 
-3. [ ] **Task 03: Desenvolvimento do Driver MikroTik (MVP)**
+3. [~] **Task 03: Desenvolvimento do Driver MikroTik (MVP)**
+   - ✅ Conexão Netmiko e coleta `/export verbose`
+   - ✅ Parse de cabeçalho e montagem de `DeviceConfig`
+   - ⏳ Falta integração completa com pipeline de inventário real no `main.py`
 
-- ✅ Implementar conexão via `Netmiko`
-- ✅ Capturar saída de configuração (`/export verbose`)
-- ✅ Extrair metadados de cabeçalho (hostname/model/version)
-- ⏳ Pendente: integrar execução ponta a ponta no fluxo principal
+4. [~] **Task 04: Criação dos Templates de Parsing (TTP)**
+   - ✅ Cobertura inicial para rotas e firewall
+   - ⏳ Falta ampliar cobertura (interfaces e outros blocos do MVP)
 
-1. [ ] **Task 04: Criação dos Templates de Parsing (TTP)**
+5. [x] **Task 05: Construção do Diff Engine**
+   - ✅ Implementado em `core/diff_engine.py`
+   - ✅ Comparação semântica + auditoria específica de firewall
 
-- ✅ Converter saída textual em JSON normalizado (rotas e firewall)
-- ✅ Templates criados em `templates/mikrotik_routes.ttp` e `templates/mikrotik_firewall.ttp`
-- ⏳ Pendente: ampliar cobertura para interfaces e demais blocos do MVP
+6. [x] **Task 06: Módulo de Relatório e Logging**
+   - ✅ Logging central implementado
+   - ✅ Persistência de relatório em JSON, HTML e SQLite
 
-1. [ ] **Task 05: Construção do Diff Engine**
+7. [x] **Task 07: Sistema de Gestão de Credenciais**
+   - ✅ Cofre criptografado implementado em `utils/vault.py`
+   - ✅ CLI de setup e gestão em `utils/vault_setup.py`
 
-- Comparar baseline x estado atual
-- Identificar ausência, adição e alteração de valores
+8. [ ] **Task 08: Exposição como MCP Server**
+   - ❌ Ainda não iniciado
 
-1. [ ] **Task 06: Módulo de Relatório e Logging**
+9. [ ] **Task 09: Análise de Desvio Assistida por IA (AI Drift Analysis)**
+   - ❌ Ainda não iniciado
 
-- ✅ Logging interno centralizado implementado (`internalloggin/logger.py`)
-- ✅ Integração inicial aplicada em `main.py`, `core/base_driver.py` e `inventory/customer/customer.py`
-- Persistir resultados em logs estruturados de auditoria
-- Opcional: persistência em SQLite para histórico
+10. [ ] **Task 10: Remediação Sugerida por IA**
 
-1. [ ] **Task 07: Sistema de Gestão de Credenciais**
+- ❌ Ainda não iniciado
 
-- Integrar variáveis de ambiente/cofre de segredos
-- Garantir uso seguro em ambientes multi-cliente
+### Próximas prioridades recomendadas (curto prazo)
 
-1. [ ] **Task 08: Exposição como MCP Server**
-
-- Implementar módulo `mcp/server.py` que envolve as funções de auditoria como *tools* consumíveis pelo protocolo MCP (Model Context Protocol)
-- Definir schemas de entrada/saída das ferramentas usando Pydantic, garantindo compatibilidade com qualquer orquestrador compatível com MCP (OpenClaw, Claude Desktop, etc.)
-- Expor endpoint HTTP/SSE para que agentes de IA possam solicitar auditorias em tempo real via chat ou voz
-- Implementar autenticação por token (Bearer) para proteger o servidor MCP contra acesso não autorizado
-- Cobrir o servidor com testes unitários e de integração
-- **Entregável:** `mcp/server.py`, `mcp/tool_schemas.py`, `mcp/__init__.py`
-
-1. [ ] **Task 09: Análise de Desvio Assistida por IA (AI Drift Analysis)**
-
-- Criar módulo `ai/drift_analyzer.py` responsável por serializar o diff produzido pelo Diff Engine e enviá-lo a um LLM (OpenAI/OpenClaw) via chamada de API
-- Definir prompt de sistema especializado em segurança de redes para guiar a interpretação semântica das alterações detectadas
-- Mapear a severidade retornada pelo modelo para os níveis de criticidade já definidos no projeto (`INFO`, `WARNING`, `CRITICAL`)
-- Garantir *fallback* gracioso quando a API de IA estiver indisponível, registrando o diff sem análise semântica e continuando o fluxo normal de auditoria
-- Implementar cache de respostas para evitar chamadas repetidas ao LLM para diffs idênticos
-- **Entregável:** `ai/drift_analyzer.py`, `ai/prompt_templates.py`, `ai/__init__.py`
-
-1. [ ] **Task 10: Remediação Sugerida por IA**
-
-- Criar módulo `ai/remediation.py` que recebe os desvios classificados e solicita ao LLM a geração dos comandos CLI exatos para retornar o dispositivo ao estado da Baseline
-- Validar os comandos sugeridos contra um conjunto de padrões permitidos (*allowlist*) antes de apresentá-los ao operador, prevenindo execução de comandos destrutivos
-- Apresentar as sugestões em relatório estruturado (JSON + Markdown), incluindo risco estimado de cada remediação e possível impacto operacional
-- Integrar o módulo ao fluxo de auditoria existente como etapa opcional, acionável por flag de linha de comando (`--suggest-remediation`)
-- **Entregável:** `ai/remediation.py`, atualização em `main.py` para suportar a nova flag
+1. Integrar fluxo real `inventário → driver → diff → report` no `main.py` (sem dados mock).
+2. Criar `IncidentEngine` para transformar drifts em incidentes consumíveis pelo dashboard.
+3. Conectar endpoints Flask (`/devices`, `/incidents`) ao histórico SQLite.
+4. Adicionar autenticação por token estático em produção e política de rotação.
+5. Incluir testes automatizados de regressão para diff/report/vault.
 
 ---
 
