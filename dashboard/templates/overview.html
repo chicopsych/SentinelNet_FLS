@@ -6,7 +6,7 @@
 <!-- Header -->
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <h1 class="h4 mb-0">
-    <i class="bi bi-speedometer2 me-2 text-warning"></i>Visao Geral do Ambiente
+    <i class="bi bi-speedometer2 me-2 text-warning"></i>Visão Geral do Ambiente
   </h1>
   <div class="d-flex align-items-center gap-3">
     <span id="stream-status" class="badge bg-secondary">
@@ -80,13 +80,13 @@
         <div class="row text-center mt-2">
           <div class="col-6">
             <p id="kpi-mtta" class="fw-bold fs-5 mb-0 text-primary">
-              {{ overview.slo.mtta_minutes if overview.slo.mtta_minutes is not none else '--' }}
+              {{ overview.slo.mtta_minutes if overview.slo.mtta_minutes is not none else 'Sem dados suficientes' }}
             </p>
             <p class="text-muted small mb-0">MTTA (min)</p>
           </div>
           <div class="col-6">
             <p id="kpi-mttr" class="fw-bold fs-5 mb-0 text-primary">
-              {{ overview.slo.mttr_minutes if overview.slo.mttr_minutes is not none else '--' }}
+              {{ overview.slo.mttr_minutes if overview.slo.mttr_minutes is not none else 'Sem dados suficientes' }}
             </p>
             <p class="text-muted small mb-0">MTTR (min)</p>
           </div>

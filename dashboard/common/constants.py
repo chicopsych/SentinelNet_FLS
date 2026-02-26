@@ -4,7 +4,7 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent.parent.parent / "inventory" / "sentinel_data.db"
 
-OPEN_INCIDENT_STATUSES = ("new", "em_analise")
+OPEN_INCIDENT_STATUSES = ("new", "novo", "em_analise")
 
 SSE_MIN_SECONDS = 5
 SSE_MAX_SECONDS = 300

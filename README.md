@@ -301,6 +301,9 @@ python main.py
 # 4) Iniciar o dashboard Flask (desenvolvimento)
 python run.py
 # Acesse: http://127.0.0.1:5000/health/overview
+
+# Produção (debug desativado)
+FLASK_ENV=production python run.py
 ```
 
 ### Pré-requisitos
@@ -323,6 +326,8 @@ python run.py
 - `GET /devices/discover` e `POST /devices/discover` → discovery de ativos por faixa CIDR (nmap)
 - `GET /devices/onboard` e `POST /devices/onboard` → cadastro manual de ativo com persistência no SQLite
 - `GET /incidents/` e `GET /incidents/<incident_id>`
+- Filtros de `/incidents/`: `customer`, `device_id`, `vendor`, `severity`, `min_severity`, `status`, `start_date`, `end_date`, `sort`, `page`
+- Compatibilidade de status legado em incidentes: `new` é normalizado para `novo` na UI/API
 - `GET /auth/verify` (protegido por token)
 - `POST /incidents/<incident_id>/remediation/ui/suggest` (UI)
 - `POST /incidents/<incident_id>/remediation/ui/approve` (UI)

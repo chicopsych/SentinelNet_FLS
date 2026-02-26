@@ -69,7 +69,13 @@
 {% set added     = diff.get('added', {}) %}
 {% set removed   = diff.get('removed', {}) %}
 {% set fw_audit  = diff.get('firewall_audit', {}) %}
-{% set has_diff  = modified or added or removed or fw_audit.values() | selectattr('__len__') | list %}
+{% set fw_has_items = (
+  fw_audit.get('position_drift')
+  or fw_audit.get('parameter_drift')
+  or fw_audit.get('missing_rules')
+  or fw_audit.get('extra_rules')
+) %}
+{% set has_diff  = modified or added or removed or fw_has_items %}
 
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-white fw-semibold d-flex align-items-center gap-2">

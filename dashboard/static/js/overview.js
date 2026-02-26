@@ -17,6 +17,8 @@
 
   let evtSource = null;
   let pollTimer = null;
+  let heartbeatTimer = null;
+  let reconnectAttempts = 0;
   let currentInterval = parseInt(localStorage.getItem("sentinel_sse_interval") || "30", 10);
 
   const sel = document.getElementById("interval-select");
@@ -42,21 +44,49 @@
     }
 
     evtSource = new EventSource(`${streamUrl}?interval=${currentInterval}`);
-    evtSource.onopen = () => setStatus("success", "ao vivo");
+    evtSource.onopen = () => {
+      reconnectAttempts = 0;
+      setStatus("success", "ao vivo");
+      scheduleHeartbeatGuard();
+    };
     evtSource.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
         if (data && data.devices) applyData(data);
+        scheduleHeartbeatGuard();
       } catch (_error) {
         setStatus("warning", "dados inválidos");
       }
     };
     evtSource.onerror = () => {
+      reconnectAttempts += 1;
       setStatus("warning", "reconectando...");
-      evtSource.close();
-      evtSource = null;
-      setTimeout(startPolling, 5000);
+      if (evtSource) {
+        evtSource.close();
+        evtSource = null;
+      }
+      if (reconnectAttempts <= 2) {
+        setTimeout(startSSE, 3000);
+      } else {
+        startPolling();
+      }
     };
+  }
+
+  function scheduleHeartbeatGuard() {
+    if (heartbeatTimer) clearTimeout(heartbeatTimer);
+    heartbeatTimer = setTimeout(() => {
+      if (evtSource) {
+        evtSource.close();
+        evtSource = null;
+      }
+      reconnectAttempts += 1;
+      if (reconnectAttempts <= 2) {
+        startSSE();
+      } else {
+        startPolling();
+      }
+    }, Math.max(15000, currentInterval * 2000));
   }
 
   function startPolling() {
@@ -85,6 +115,10 @@
       clearInterval(pollTimer);
       pollTimer = null;
     }
+    if (heartbeatTimer) {
+      clearTimeout(heartbeatTimer);
+      heartbeatTimer = null;
+    }
   }
 
   function applyData(data) {
@@ -98,8 +132,8 @@
     setText("kpi-inc-info", data.incidents.info);
     setText("kpi-remed-pending", data.remediation.pending_approval);
     setText("kpi-remed-executed", data.remediation.executed_today);
-    setText("kpi-mtta", data.slo.mtta_minutes != null ? data.slo.mtta_minutes : "--");
-    setText("kpi-mttr", data.slo.mttr_minutes != null ? data.slo.mttr_minutes : "--");
+    setText("kpi-mtta", data.slo.mtta_minutes != null ? data.slo.mtta_minutes : "Sem dados suficientes");
+    setText("kpi-mttr", data.slo.mttr_minutes != null ? data.slo.mttr_minutes : "Sem dados suficientes");
     updateRecentTable(data.recent_incidents || []);
 
     if (lastUpdEl) {

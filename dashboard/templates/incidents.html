@@ -22,27 +22,83 @@
     />
   </div>
   <div class="col-sm-2">
+    <label class="form-label small text-muted mb-1">Dispositivo</label>
+    <input
+      type="text"
+      name="device_id"
+      class="form-control form-control-sm"
+      placeholder="ex: borda-01"
+      value="{{ filters.device_id or '' }}"
+    />
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small text-muted mb-1">Vendor</label>
+    <input
+      type="text"
+      name="vendor"
+      class="form-control form-control-sm"
+      placeholder="ex: mikrotik"
+      title="Filtrar por vendor"
+      value="{{ filters.vendor or '' }}"
+    />
+  </div>
+  <div class="col-sm-2">
     <label class="form-label small text-muted mb-1">Severidade</label>
     <select name="severity" class="form-select form-select-sm" title="Filtrar por Severidade">
       <option value="">Todas</option>
-      <option value="CRITICAL" {% if filters.severity == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
-      <option value="HIGH"     {% if filters.severity == 'HIGH'     %}selected{% endif %}>HIGH</option>
-      <option value="MEDIUM"   {% if filters.severity == 'MEDIUM'   %}selected{% endif %}>MEDIUM</option>
-      <option value="WARNING"  {% if filters.severity == 'WARNING'  %}selected{% endif %}>WARNING</option>
-      <option value="LOW"      {% if filters.severity == 'LOW'      %}selected{% endif %}>LOW</option>
-      <option value="INFO"     {% if filters.severity == 'INFO'     %}selected{% endif %}>INFO</option>
+      {% for sev in severity_options %}
+      <option value="{{ sev }}" {% if filters.severity == sev %}selected{% endif %}>{{ sev }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small text-muted mb-1">Severidade mínima</label>
+    <select name="min_severity" class="form-select form-select-sm" title="Filtrar por severidade mínima">
+      <option value="">Sem mínimo</option>
+      <option value="INFO" {% if filters.min_severity == 'INFO' %}selected{% endif %}>INFO</option>
+      <option value="LOW" {% if filters.min_severity == 'LOW' %}selected{% endif %}>LOW</option>
+      <option value="WARNING" {% if filters.min_severity == 'WARNING' %}selected{% endif %}>WARNING</option>
+      <option value="MEDIUM" {% if filters.min_severity == 'MEDIUM' %}selected{% endif %}>MEDIUM</option>
+      <option value="HIGH" {% if filters.min_severity == 'HIGH' %}selected{% endif %}>HIGH</option>
+      <option value="CRITICAL" {% if filters.min_severity == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
     </select>
   </div>
   <div class="col-sm-2">
     <label class="form-label small text-muted mb-1">Status</label>
     <select name="status" class="form-select form-select-sm" title="Filtrar por Status">
       <option value="">Todos</option>
-      <option value="novo"        {% if filters.status == 'novo'        %}selected{% endif %}>Novo</option>
-      <option value="em_analise"  {% if filters.status == 'em_analise'  %}selected{% endif %}>Em análise</option>
-      <option value="aprovado"    {% if filters.status == 'aprovado'    %}selected{% endif %}>Aprovado</option>
-      <option value="executado"   {% if filters.status == 'executado'   %}selected{% endif %}>Executado</option>
-      <option value="validado"    {% if filters.status == 'validado'    %}selected{% endif %}>Validado</option>
-      <option value="falhou"      {% if filters.status == 'falhou'      %}selected{% endif %}>Falhou</option>
+      {% for item in status_options %}
+      <option value="{{ item.value }}" {% if filters.status == item.value %}selected{% endif %}>{{ item.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small text-muted mb-1">Início</label>
+    <input
+      type="date"
+      name="start_date"
+      class="form-control form-control-sm"
+      title="Data inicial"
+      value="{{ filters.start_date or '' }}"
+    />
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small text-muted mb-1">Fim</label>
+    <input
+      type="date"
+      name="end_date"
+      class="form-control form-control-sm"
+      title="Data final"
+      value="{{ filters.end_date or '' }}"
+    />
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small text-muted mb-1">Ordenação</label>
+    <select name="sort" class="form-select form-select-sm" title="Ordenar incidentes">
+      <option value="newest" {% if (filters.sort or 'newest') == 'newest' %}selected{% endif %}>Mais recentes</option>
+      <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Mais antigos</option>
+      <option value="severity_desc" {% if filters.sort == 'severity_desc' %}selected{% endif %}>Severidade (maior)</option>
+      <option value="severity_asc" {% if filters.sort == 'severity_asc' %}selected{% endif %}>Severidade (menor)</option>
     </select>
   </div>
   <div class="col-sm-auto">
@@ -106,12 +162,12 @@
 <!-- Paginação simples -->
 <nav aria-label="Navegação de páginas de incidentes">
   <ul class="pagination pagination-sm justify-content-end">
-    {% if page > 1 %}
-    <li class="page-item"><a class="page-link" href="?page={{ page - 1 }}" aria-label="Página anterior">Anterior</a></li>
+    {% if has_prev %}
+    <li class="page-item"><a class="page-link" href="{{ url_for('incidents.list_incidents', page=page - 1, customer=base_query.customer, device_id=base_query.device_id, vendor=base_query.vendor, severity=base_query.severity, min_severity=base_query.min_severity, status=base_query.status, start_date=base_query.start_date, end_date=base_query.end_date, sort=base_query.sort) }}" aria-label="Página anterior">Anterior</a></li>
     {% endif %}
     <li class="page-item active" aria-current="page"><span class="page-link">{{ page }}</span></li>
-    {% if incidents|length == 25 %}
-    <li class="page-item"><a class="page-link" href="?page={{ page + 1 }}">Próxima</a></li>
+    {% if has_next %}
+    <li class="page-item"><a class="page-link" href="{{ url_for('incidents.list_incidents', page=page + 1, customer=base_query.customer, device_id=base_query.device_id, vendor=base_query.vendor, severity=base_query.severity, min_severity=base_query.min_severity, status=base_query.status, start_date=base_query.start_date, end_date=base_query.end_date, sort=base_query.sort) }}">Próxima</a></li>
     {% endif %}
   </ul>
 </nav>

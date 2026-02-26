@@ -1,2 +1,21 @@
 {% set _status = status or '—' %}
-<span class="badge bg-{{ color or 'secondary' }}{% if text_dark %} text-dark{% endif %}{% if size %} fs-{{ size }}{% endif %}">{{ _status }}</span>
+{% set _status_text = (_status|string)|lower %}
+{% set _color = color %}
+{% if not _color %}
+	{% if _status_text in ['new', 'novo'] %}
+		{% set _color = 'secondary' %}
+	{% elif _status_text == 'em_analise' %}
+		{% set _color = 'info' %}
+	{% elif _status_text == 'aprovado' %}
+		{% set _color = 'primary' %}
+	{% elif _status_text == 'executado' %}
+		{% set _color = 'warning' %}
+	{% elif _status_text == 'validado' %}
+		{% set _color = 'success' %}
+	{% elif _status_text in ['falhou', 'revertido'] %}
+		{% set _color = 'danger' %}
+	{% else %}
+		{% set _color = 'secondary' %}
+	{% endif %}
+{% endif %}
+<span class="badge bg-{{ _color }}{% if text_dark %} text-dark{% endif %}{% if size %} fs-{{ size }}{% endif %}">{{ _status }}</span>

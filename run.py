@@ -21,9 +21,13 @@ config_class = _ENV_MAP.get(env, DevelopmentConfig)
 
 app = create_app(config_class=config_class)
 
+debug_mode = bool(app.config.get("DEBUG", False))
+if env in _ENV_MAP:
+    debug_mode = False
+
 if __name__ == "__main__":
     app.run(
         host=os.getenv("FLASK_HOST", "127.0.0.1"),
         port=int(os.getenv("FLASK_PORT", 5000)),
-        debug=app.config.get("DEBUG", True),
+        debug=debug_mode,
     )

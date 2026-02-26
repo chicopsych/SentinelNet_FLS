@@ -89,13 +89,16 @@ def _get_overview_data() -> dict[str, Any]:
 
 def _sse_generator(interval: int) -> Generator[str, None, None]:
     """Gera eventos SSE com os KPIs atualizados a cada `interval` segundos."""
+    yield "retry: 5000\n\n"
     while True:
         try:
             data = _get_overview_data()
             payload = json.dumps(data, default=str)
             yield f"data: {payload}\n\n"
+            yield ": heartbeat\n\n"
         except Exception:  # noqa: BLE001
             yield "data: {}\n\n"
+            yield ": heartbeat\n\n"
         time.sleep(interval)
 
 
