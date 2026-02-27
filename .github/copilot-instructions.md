@@ -6,7 +6,9 @@ O **SentinelNet_FLS** é uma ferramenta de auditoria contínua de rede baseada e
 
 ## 🛠️ Stack Técnica Obrigatória
 
-- **Linguagem:** Python 3.10+ com tipagem estática (type hinting) e PEP8.
+- **Linguagem:** Python 3.10+ com tipagem estática (type hinting) e PEP8. 
+
+- **Não deixar que as linhas excedam 79 caracteres.**
 
 - **Network:** Netmiko (SSH) e TTP (parsing de CLI para JSON).
 

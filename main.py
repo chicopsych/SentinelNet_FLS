@@ -9,7 +9,8 @@ Fluxo:
        a) Obtém credenciais via VaultManager (sem expor segredos nos logs).
        b) Instancia o driver correto (ex: MikroTikDriver).
        c) Coleta snapshot de configuração atual.
-       d) Carrega a Baseline JSON de inventory/baselines/<customer>/<device>.json.
+       d) Carrega a Baseline JSON de
+          inventory/baselines/<cust>/<dev>.json.
        e) Compara snapshot × baseline com DiffEngine.
        f) Persiste desvios no SQLite via IncidentEngine.
     3. Falha isolada por dispositivo — demais continuam sendo auditados.
@@ -18,23 +19,31 @@ Fluxo:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from core import DiffEngine
 from core.incident_engine import incident_engine
 from core.schemas import DeviceConfig
 from drivers.mikrotik_driver import MikroTikDriver
-from dashboard.repositories.devices_repository import list_active_inventory_devices
+from dashboard.repositories.devices_repository import (
+    list_active_inventory_devices,
+)
 from internalloggin.logger import setup_logger
-from utils.vault import CredentialNotFoundError, MasterKeyNotFoundError, VaultError, VaultManager
+from utils.vault import (
+    CredentialNotFoundError,
+    MasterKeyNotFoundError,
+    VaultError,
+    VaultManager,
+)
 
 logger = setup_logger(__name__)
 
-# Diretório das baselines JSON — inventory/baselines/<customer_id>/<device_id>.json
+# Diretório das baselines JSON
+# inventory/baselines/<customer_id>/<device_id>.json
 _BASELINES_DIR = Path(__file__).resolve().parent / "inventory" / "baselines"
 
 
-# ── Baseline ───────────────────────────────────────────────────────────────────
+# ── Baseline ──────────────────────────────────────────────────────────────
 
 
 def _load_baseline(customer_id: str, device_id: str) -> DeviceConfig | None:
@@ -50,7 +59,9 @@ def _load_baseline(customer_id: str, device_id: str) -> DeviceConfig | None:
         )
         return None
     try:
-        return DeviceConfig.model_validate_json(path.read_text(encoding="utf-8"))
+        return DeviceConfig.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
     except Exception as exc:  # noqa: BLE001
         logger.error(
             "Falha ao carregar baseline de %s/%s: %s",
@@ -59,15 +70,17 @@ def _load_baseline(customer_id: str, device_id: str) -> DeviceConfig | None:
         return None
 
 
-def _save_baseline(customer_id: str, device_id: str, config: DeviceConfig) -> None:
-    """Persiste a configuração atual como nova baseline JSON (primeiro acesso)."""
+def _save_baseline(
+    customer_id: str, device_id: str, config: DeviceConfig
+) -> None:
+    """Persiste configuração atual como nova baseline JSON."""
     path = _BASELINES_DIR / customer_id / f"{device_id}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(config.model_dump_json(indent=2), encoding="utf-8")
     logger.info("Nova baseline salva em '%s'.", path)
 
 
-# ── Ciclo de auditoria por dispositivo ────────────────────────────────────────
+# ── Ciclo de auditoria por dispositivo ───────────────────────────────────
 
 
 def _classify_severity(diff_dict: dict[str, Any]) -> str:
@@ -119,12 +132,15 @@ def _audit_device(vault: VaultManager, device_info: dict[str, Any]) -> None:
             port=int(creds.get("port", 22)),
         )
     else:
-        raise ValueError(f"Vendor '{vendor}' ainda não tem driver implementado.")
+        msg = f"Vendor '{vendor}' ainda não tem driver implementado."
+        raise ValueError(msg)
 
     # c) Coleta snapshot atual via SSH (context manager garante disconnect)
+    current = cast(DeviceConfig, None)
     with driver:
-        current: DeviceConfig = driver.get_config_snapshot()
+        current = driver.get_config_snapshot()
 
+    # type: ignore[possibly-unbound]  # current sempre existe após with
     logger.info(
         "Snapshot coletado: %s  OS=%s  modelo=%s",
         current.hostname, current.os_version, current.model,
@@ -134,7 +150,8 @@ def _audit_device(vault: VaultManager, device_info: dict[str, Any]) -> None:
     baseline = _load_baseline(customer_id, device_id)
     if baseline is None:
         logger.warning(
-            "[%s/%s] Sem baseline prévia — snapshot salvo como referência inicial.",
+            "[%s/%s] Sem baseline prévia — "
+            "snapshot salvo como referência inicial.",
             customer_id, device_id,
         )
         _save_baseline(customer_id, device_id, current)
@@ -144,10 +161,17 @@ def _audit_device(vault: VaultManager, device_info: dict[str, Any]) -> None:
     report = DiffEngine.compare(baseline, current)
 
     if not report.has_drift:
-        logger.info("[%s/%s] Em conformidade — nenhum desvio detectado.", customer_id, device_id)
+        logger.info(
+            "[%s/%s] Em conformidade — nenhum desvio detectado.",
+            customer_id, device_id,
+        )
         return
 
-    logger.warning("[%s/%s] Drift detectado — %s", customer_id, device_id, report.summary())
+    logger.warning(
+        "[%s/%s] Drift detectado — %s",
+        customer_id, device_id,
+        report.summary(),
+    )
 
     # f) Persiste o incidente no SQLite via IncidentEngine
     diff_dict = report.to_dict()
@@ -158,7 +182,9 @@ def _audit_device(vault: VaultManager, device_info: dict[str, Any]) -> None:
         device_id=device_id,
         severity=severity,
         category="configuration_drift",
-        description=f"Drift detectado em {current.hostname}: {report.summary()}",
+        description=(
+            f"Drift detectado em {baseline.hostname}: {report.summary()}"
+        ),
         payload={
             "diff": diff_dict,
             "vendor": vendor,
@@ -175,7 +201,7 @@ def _audit_device(vault: VaultManager, device_info: dict[str, Any]) -> None:
         )
 
 
-# ── Loop principal ─────────────────────────────────────────────────────────────
+# ── Loop principal ────────────────────────────────────────────────────────
 
 
 def run_audit_loop() -> None:
@@ -186,10 +212,15 @@ def run_audit_loop() -> None:
     """
     logger.info("SentinelNet_FLS — Loop de Auditoria iniciado.")
     inventory_devices = list_active_inventory_devices()
-    logger.info("Dispositivos ativos no inventário: %d", len(inventory_devices))
+    logger.info(
+        "Dispositivos ativos no inventário: %d", len(inventory_devices)
+    )
 
     if not inventory_devices:
-        logger.warning("Nenhum dispositivo ativo encontrado no inventário persistido. Auditoria encerrada.")
+        logger.warning(
+            "Nenhum dispositivo ativo encontrado no inventário persistido. "
+            "Auditoria encerrada."
+        )
         return
 
     # Inicializa o VaultManager uma única vez para toda a rodada
@@ -215,16 +246,28 @@ def run_audit_loop() -> None:
             _audit_device(vault, device_info)
             success_count += 1
         except CredentialNotFoundError as exc:
-            logger.error("[%s/%s] Credenciais não encontradas no cofre: %s", customer_id, device_id, exc)
+            logger.error(
+                "[%s/%s] Credenciais não encontradas no cofre: %s",
+                customer_id, device_id, exc,
+            )
             failure_count += 1
         except VaultError as exc:
-            logger.error("[%s/%s] Erro no cofre de credenciais: %s", customer_id, device_id, exc)
+            logger.error(
+                "[%s/%s] Erro no cofre de credenciais: %s",
+                customer_id, device_id, exc,
+            )
             failure_count += 1
         except (ConnectionError, TimeoutError, OSError) as exc:
-            logger.error("[%s/%s] Falha de conectividade com o dispositivo: %s", customer_id, device_id, exc)
+            logger.error(
+                "[%s/%s] Falha de conectividade com o dispositivo: %s",
+                customer_id, device_id, exc,
+            )
             failure_count += 1
         except Exception as exc:  # noqa: BLE001
-            logger.exception("[%s/%s] Erro inesperado durante auditoria: %s", customer_id, device_id, exc)
+            logger.exception(
+                "[%s/%s] Erro inesperado durante auditoria: %s",
+                customer_id, device_id, exc,
+            )
             failure_count += 1
 
     logger.info(
