@@ -52,12 +52,15 @@ internalloggin/internallogs/*
 # ────────── SEGURANÇA: Arquivos sensíveis ──────────────────────────────────
 # Variáveis de ambiente / secrets (nunca versionem!)
 .env
+.env.*
 .env.local
 .env.*.local
 .env.production
 .env.staging
 .env.development
 *.env
+!.env.example
+.envrc
 
 # Certificados, chaves privadas e material criptográfico
 *.pem
@@ -72,6 +75,11 @@ internalloggin/internallogs/*
 *.der
 *.pub
 *.asc
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.kdbx
 
 # Cofre de credenciais criptografado
 # Seguro em si (criptografado), mas não versionamos por boas práticas
@@ -90,6 +98,10 @@ secrets/
 *.bak
 *.old
 *.orig
+*.secret
+*.secrets
+*.token
+*.credentials
 
 # IDE / editor
 .vscode/

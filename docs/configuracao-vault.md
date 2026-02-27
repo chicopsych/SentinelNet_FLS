@@ -36,12 +36,12 @@ Saída esperada:
   NOVA MASTER KEY (Fernet / AES-128-CBC)
 ════════════════════════════════════════════════════════════════
 
-  yJxFlYV2a2izS1FqIbHqZVlIhMIzceLO70MDmzlD6Vo=
+  CHAVE_GERADA_NO_AMBIENTE_LOCAL
 
   INSTRUÇÕES:
   1. Copie a chave acima.
   2. Configure a variável de ambiente:
-     export SENTINEL_MASTER_KEY="yJxFlYV2a2izS1FqIbHqZVlIhMIzceLO70MDmzlD6Vo="
+    export SENTINEL_MASTER_KEY="CHAVE_GERADA_NO_AMBIENTE_LOCAL"
   3. Para persistir, adicione a linha acima ao seu ~/.bashrc
      ou ~/.zshrc (ou use um .env com dotenv).
   4. NUNCA versione esta chave no Git.
@@ -67,7 +67,7 @@ EOF
 Exemplo real:
 
 ```
-SENTINEL_MASTER_KEY=yJxFlYV2a2izS1FqIbHqZVlIhMIzceLO70MDmzlD6Vo=
+SENTINEL_MASTER_KEY=CHAVE_GERADA_NO_AMBIENTE_LOCAL
 ```
 
 > O `.env` serve para desenvolvimento local. Em produção prefira
