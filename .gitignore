@@ -20,6 +20,8 @@ venv/
 .venv/
 env/
 ENV/
+venv.bak/
+env.bak/
 
 # Unit test / coverage reports
 .pytest_cache/
@@ -28,47 +30,114 @@ ENV/
 htmlcov/
 .tox/
 .nox/
+.hypothesis/
 
 # Type checkers / linters
 .mypy_cache/
 .pyre/
 .ruff_cache/
+.pylint.d/
 
 # Jupyter Notebook
 .ipynb_checkpoints/
+*.ipynb
 
 # Logs
 *.log
 logs/*
+internalloggin/internallogs/*
 !logs/.gitkeep
+!internalloggin/internallogs/.gitkeep
 
-# Local environment / secrets
+# ────────── SEGURANÇA: Arquivos sensíveis ──────────────────────────────────
+# Variáveis de ambiente / secrets (nunca versionem!)
 .env
-.env.*
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+*.env
+
+# Certificados, chaves privadas e material criptográfico
 *.pem
 *.key
 *.crt
+*.cer
 *.p12
 *.pfx
+*.jks
+*.pks12
+*.rsa
+*.der
+*.pub
+*.asc
 
-# Cofre de credenciais criptografado (Task 07)
-# O arquivo .enc é seguro (criptografado), mas por boas práticas
-# não versionamos dados de credenciais — mesmo criptografados.
+# Cofre de credenciais criptografado
+# Seguro em si (criptografado), mas não versionamos por boas práticas
 inventory/vault.enc
+inventory/vault.*
+
+# Arquivos de configuração sensíveis (pode conter endpoints, tokens, etc.)
+.config/
+*.config.json
+*.config.yaml
+*.secrets*
+secrets/
+
+# Arquivos de backup de credenciais
+*.backup
+*.bak
+*.old
+*.orig
 
 # IDE / editor
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.sublime-*
 
 # OS files
 .DS_Store
 Thumbs.db
+.windows-terminal-settings.json
 
 # Project temp files
 *.tmp
-*.bak
+.tmp/
+*.temp
 
-# Database files
+# Database files (SQLite local development)
 *.db
+*.sqlite
+*.sqlite3
+inventory/sentinel_data.db
+inventory/*.db
+
+# Relatórios e outputs sensíveis
+reports/*
+audit_reports/*
+!reports/.gitkeep
+!audit_reports/.gitkeep
+
+# Caches específicos
+.cache/
+.scrapy/
+.env.cache
+
+# MacOS
+.AppleDouble
+.LSOverride
+*.DS_Store
+
+# Windows
+desktop.ini
+$RECYCLE.BIN/
+
+# Python
+pip-log.txt
+pip-delete-this-directory.txt
+.Python
+pip.log

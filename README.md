@@ -287,13 +287,60 @@ SentinelNet_FLS/
 
 ---
 
-## 🛡️ Premissas de Segurança
+## 🛡️ Segurança
+
+Este projeto implementa **controles rigorosos de segurança** para proteger credenciais e evitar vazamento de informações sensíveis. Consulte o documento completo de segurança em [**SECURITY.md**](SECURITY.md).
+
+### Premissas de Design
 
 - **Integridade da conexão:** validar fingerprint SSH para mitigar MITM
-- **Proteção de segredos:** nunca armazenar credenciais em texto puro
+- **Proteção de segredos:** NUNCA armazenar credenciais em texto puro — sempre via `VaultManager` com Fernet
 - **Mínimo privilégio:** usar contas de coleta com perfil somente leitura
-- **Rastreabilidade:** registrar quem executou, quando e contra quais ativos
+- **Rastreabilidade:** registrar quem executou, quando e contra quais ativos (auditoria sem exposição de senhas)
 - **Separação por cliente:** isolar inventário, logs e parâmetros sensíveis
+
+### Controles Técnicos Implementados
+
+| Controle | Descrição |
+|---|---|
+| **Criptografia Fernet** | Credenciais SNMP e SSH persistem criptografadas em `inventory/vault.enc` |
+| **Master Key via `.env`** | Variável de ambiente `SENTINEL_MASTER_KEY` — nunca coded no repositório |
+| **Git Hooks (pre-commit)** | Script de bloqueio (`scripts/pre-commit.sh`) impede commit de secrets |
+| **.gitignore expandido** | 95+ padrões bloqueiam `.env`, `*.pem`, `*.key`, `vault.enc`, `*.db` e outros |
+| **Sanitização de logs** | Payload de erros é filtrado para não expor senhas/tokens via `_sanitize_error()` |
+| **Zero hardcoding** | Auditoria confirma: não há secrets no código, apenas placeholders (`password="..."`) |
+| **Documentação `.env.example`** | Template para desenvolvedores sem valores reais |
+
+### Configuração Inicial (Segura)
+
+Para configurar o projeto com proteção de credenciais:
+
+1. **Gerar Master Key e criar `.env`:**
+   ```bash
+   python3 -c "from cryptography.fernet import Fernet; \
+               key = Fernet.generate_key().decode(); \
+               with open('.env', 'w') as f: f.write(f'SENTINEL_MASTER_KEY={key}\n'); \
+               print(f'✅ Master Key: {key}')"
+   ```
+
+2. **Verificar carregamento (seu terminal mostrará a chave):**
+   ```bash
+   python3 -c "from dotenv import load_dotenv; load_dotenv(); \
+               import os; print(os.getenv('SENTINEL_MASTER_KEY')[:20] + '...')"
+   ```
+
+3. **Instalar hook pre-commit (opcional mas **recomendado**):**
+   ```bash
+   chmod +x scripts/pre-commit.sh
+   cp scripts/pre-commit.sh .git/hooks/pre-commit
+   ```
+
+Para guia completo de setup e produção, veja [docs/configuracao-vault.md](docs/configuracao-vault.md).
+
+### Responsabilidade de Divulgação
+
+Se descobrir uma vulnerabilidade, envie email para **chicopsych@protonmail.com** em vez de abrir issue pública.
+Inclua: descrição, passos para reproduzir, versão afetada e sugestão de correção.
 
 ---
 
