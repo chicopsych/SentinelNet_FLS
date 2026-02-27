@@ -1,47 +1,65 @@
 """
-dashboard/blueprints/incidents.py
-Blueprint de gerenciamento de incidentes (drift e falhas).
+api/blueprints/incidents.py
+Blueprint de gerenciamento de incidentes (drift/falhas).
 
 Endpoints:
-    GET  /incidents                — lista com filtros + paginação
-    GET  /incidents/<int:id>       — detalhe completo + diff estruturado
+    GET  /incidents/           — lista + filtros + paginação
+    GET  /incidents/<int:id>   — detalhe + diff estruturado
 """
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import (
+    Blueprint,
+    jsonify,
+    render_template,
+    request,
+)
 
-from dashboard.common.http import wants_json
-from dashboard.repositories.incidents_repository import (
+from api.http_utils import wants_json
+from core.repositories.incidents_repository import (
     get_incident as repo_get_incident,
-    list_distinct_severities as repo_list_distinct_severities,
-    list_distinct_statuses as repo_list_distinct_statuses,
+    list_distinct_severities as repo_severities,
+    list_distinct_statuses as repo_statuses,
     list_incidents as repo_list_incidents,
 )
 
 incidents_bp = Blueprint("incidents", __name__)
 
+_STATUS_LABELS: dict[str, str] = {
+    "new": "Novo",
+    "novo": "Novo",
+    "em_analise": "Em análise",
+    "aprovado": "Aprovado",
+    "executado": "Executado",
+    "validado": "Validado",
+    "falhou": "Falhou",
+    "revertido": "Revertido",
+}
 
-# ── Rotas ──────────────────────────────────────────────────────────────────────
+
+# ── Rotas ────────────────────────────────────────────
 
 
 @incidents_bp.get("/")
 def list_incidents():
-    """
-    Lista incidentes com filtros por cliente, severidade e status.
-    Retorna HTML para navegador ou JSON para clientes de API.
-    """
+    """Lista incidentes com filtros e paginação."""
     customer = request.args.get("customer")
     device_id = request.args.get("device_id")
     vendor = request.args.get("vendor")
     severity = request.args.get("severity")
-    min_severity = request.args.get("min_severity")
-    status   = request.args.get("status")
+    min_severity = request.args.get(
+        "min_severity"
+    )
+    status = request.args.get("status")
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
     sort = request.args.get("sort", "newest")
     try:
-        page = max(1, int(request.args.get("page", 1)))
+        page = max(
+            1,
+            int(request.args.get("page", 1)),
+        )
     except (TypeError, ValueError):
         page = 1
     page_size = 25
@@ -87,23 +105,28 @@ def list_incidents():
             }
         )
 
-    severity_options = repo_list_distinct_severities() or [
-        "CRITICAL", "HIGH", "WARNING", "INFO"
+    severity_options = repo_severities() or [
+        "CRITICAL",
+        "HIGH",
+        "WARNING",
+        "INFO",
     ]
-    status_values = repo_list_distinct_statuses() or ["new", "em_analise", "aprovado", "executado", "validado", "falhou"]
-    status_label_map = {
-        "new": "Novo",
-        "novo": "Novo",
-        "em_analise": "Em análise",
-        "aprovado": "Aprovado",
-        "executado": "Executado",
-        "validado": "Validado",
-        "falhou": "Falhou",
-        "revertido": "Revertido",
-    }
+    raw_statuses = repo_statuses() or [
+        "new",
+        "em_analise",
+        "aprovado",
+        "executado",
+        "validado",
+        "falhou",
+    ]
     status_options = [
-        {"value": value, "label": status_label_map.get(value, value.replace("_", " ").title())}
-        for value in status_values
+        {
+            "value": v,
+            "label": _STATUS_LABELS.get(
+                v, v.replace("_", " ").title()
+            ),
+        }
+        for v in raw_statuses
     ]
 
     return render_template(
@@ -133,15 +156,28 @@ def list_incidents():
 
 @incidents_bp.get("/<int:incident_id>")
 def get_incident(incident_id: int):
-    """Detalhe do incidente: diff estruturado, metadados e severidade."""
+    """Detalhe: diff estruturado + metadados."""
     incident = repo_get_incident(incident_id)
 
     if incident is None:
         if wants_json(request):
-            return jsonify({"error": f"Incidente '{incident_id}' não encontrado."}), 404
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            f"Incidente "
+                            f"'{incident_id}'"
+                            " não encontrado."
+                        )
+                    }
+                ),
+                404,
+            )
         return render_template("404.html"), 404
 
     if wants_json(request):
         return jsonify(incident)
 
-    return render_template("incident_detail.html", incident=incident)
+    return render_template(
+        "incident_detail.html", incident=incident
+    )

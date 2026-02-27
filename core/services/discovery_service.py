@@ -1,4 +1,9 @@
-"""Serviço de discovery de ativos via nmap."""
+"""
+core/services/discovery_service.py
+Serviço de discovery de ativos via nmap.
+
+Agnóstico à interface — usado pelo CLI e pela API web.
+"""
 
 from __future__ import annotations
 
@@ -16,16 +21,12 @@ class DiscoveryError(RuntimeError):
 
 @dataclass(slots=True)
 class ScanOptions:
-    """Opcoes de profundidade de varredura para o nmap."""
+    """Opções de profundidade de varredura nmap."""
 
-    # Descoberta de hosts ativos (sempre executada)
     ping_only: bool = True
-    # Portas: top 100 (rapido) ou top 1000 (detalhado)
-    ports_fast: bool = False      # -F  (top 100 portas)
-    ports_extended: bool = False  # --top-ports 1000
-    # Deteccao de sistema operacional (-O, requer root/sudo)
+    ports_fast: bool = False
+    ports_extended: bool = False
     os_detection: bool = False
-    # Deteccao de versao de servicos (-sV)
     service_version: bool = False
 
 
@@ -37,45 +38,74 @@ class DiscoverResult:
     scanned_at: str
     hosts: list[dict[str, object]]
     total_hosts: int
-    scan_options: ScanOptions = field(default_factory=ScanOptions)
+    scan_options: ScanOptions = field(
+        default_factory=ScanOptions
+    )
 
 
-def _normalize_network(network_input: str) -> ipaddress.IPv4Network:
+def _normalize_network(
+    network_input: str,
+) -> ipaddress.IPv4Network:
     try:
-        network = ipaddress.ip_network(network_input.strip(), strict=False)
+        network = ipaddress.ip_network(
+            network_input.strip(), strict=False
+        )
     except ValueError as exc:
-        raise DiscoveryError("Faixa de rede inválida. Use CIDR, ex: 192.168.88.0/24") from exc
+        raise DiscoveryError(
+            "Faixa de rede inválida. "
+            "Use CIDR, ex: 192.168.88.0/24"
+        ) from exc
 
     if network.version != 4:
-        raise DiscoveryError("Apenas redes IPv4 são suportadas nesta fase.")
+        raise DiscoveryError(
+            "Apenas redes IPv4 são suportadas nesta fase."
+        )
 
     if network.num_addresses > 4096:
-        raise DiscoveryError("Faixa muito ampla. Use no máximo /20 (até 4096 endereços).")
+        raise DiscoveryError(
+            "Faixa muito ampla. "
+            "Use no máximo /20 (até 4096 endereços)."
+        )
 
     return network
 
 
-def _parse_ports(host_node: ET.Element) -> list[str]:
-    """Extrai lista de portas abertas de um no <host> do XML nmap."""
+def _parse_ports(
+    host_node: ET.Element,
+) -> list[str]:
+    """Extrai portas abertas de um nó <host> do XML nmap."""
     open_ports: list[str] = []
     ports_node = host_node.find("ports")
     if ports_node is None:
         return open_ports
     for port in ports_node.findall("port"):
         state = port.find("state")
-        if state is None or state.attrib.get("state") != "open":
+        if (
+            state is None
+            or state.attrib.get("state") != "open"
+        ):
             continue
         portid = port.attrib.get("portid", "?")
         proto = port.attrib.get("protocol", "tcp")
         svc = port.find("service")
-        svc_name = svc.attrib.get("name", "") if svc is not None else ""
-        entry = f"{portid}/{proto} ({svc_name})" if svc_name else f"{portid}/{proto}"
+        svc_name = (
+            svc.attrib.get("name", "")
+            if svc is not None
+            else ""
+        )
+        entry = (
+            f"{portid}/{proto} ({svc_name})"
+            if svc_name
+            else f"{portid}/{proto}"
+        )
         open_ports.append(entry)
     return open_ports
 
 
-def _parse_os(host_node: ET.Element) -> str | None:
-    """Extrai o melhor match de SO de um no <host> do XML nmap."""
+def _parse_os(
+    host_node: ET.Element,
+) -> str | None:
+    """Extrai melhor match de SO de um nó <host>."""
     os_node = host_node.find("os")
     if os_node is None:
         return None
@@ -84,19 +114,30 @@ def _parse_os(host_node: ET.Element) -> str | None:
         return None
     name = best.attrib.get("name", "")
     accuracy = best.attrib.get("accuracy", "")
-    return f"{name} ({accuracy}%)" if accuracy else name or None
+    return (
+        f"{name} ({accuracy}%)"
+        if accuracy
+        else name or None
+    )
 
 
-def _parse_nmap_xml(xml_content: str) -> list[dict[str, object]]:
+def _parse_nmap_xml(
+    xml_content: str,
+) -> list[dict[str, object]]:
     try:
         root = ET.fromstring(xml_content)
     except ET.ParseError as exc:
-        raise DiscoveryError("Saída XML do nmap inválida.") from exc
+        raise DiscoveryError(
+            "Saída XML do nmap inválida."
+        ) from exc
 
     hosts: list[dict[str, object]] = []
     for host in root.findall("host"):
         status = host.find("status")
-        if status is None or status.attrib.get("state") != "up":
+        if (
+            status is None
+            or status.attrib.get("state") != "up"
+        ):
             continue
 
         ipv4 = None
@@ -115,19 +156,25 @@ def _parse_nmap_xml(xml_content: str) -> list[dict[str, object]]:
         if hostnames is not None:
             hostname_node = hostnames.find("hostname")
             if hostname_node is not None:
-                hostname = hostname_node.attrib.get("name")
+                hostname = hostname_node.attrib.get(
+                    "name"
+                )
 
         if ipv4:
-            hosts.append({
-                "ip": ipv4,
-                "hostname": hostname,
-                "mac": mac,
-                "vendor": vendor,
-                "ports": _parse_ports(host),
-                "os": _parse_os(host),
-            })
+            hosts.append(
+                {
+                    "ip": ipv4,
+                    "hostname": hostname,
+                    "mac": mac,
+                    "vendor": vendor,
+                    "ports": _parse_ports(host),
+                    "os": _parse_os(host),
+                }
+            )
 
-    return sorted(hosts, key=lambda item: str(item.get("ip") or ""))
+    return sorted(
+        hosts, key=lambda item: str(item.get("ip") or "")
+    )
 
 
 def _build_command(
@@ -135,13 +182,16 @@ def _build_command(
     network: ipaddress.IPv4Network,
     opts: ScanOptions,
 ) -> list[str]:
-    """Monta o comando nmap com base nas opcoes de scan escolhidas."""
+    """Monta o comando nmap conforme opções de scan."""
     cmd = [nmap_bin, "-n"]
 
-    needs_port_scan = opts.ports_fast or opts.ports_extended or opts.service_version
+    needs_port_scan = (
+        opts.ports_fast
+        or opts.ports_extended
+        or opts.service_version
+    )
 
     if opts.os_detection:
-        # -O requer scan TCP (-sS/-sT); inclui descoberta de host
         cmd.append("-O")
 
     if opts.service_version:
@@ -151,9 +201,8 @@ def _build_command(
         if opts.ports_extended:
             cmd.extend(["--top-ports", "1000"])
         else:
-            cmd.append("-F")   # top 100 portas (rapido)
+            cmd.append("-F")
     elif not opts.os_detection:
-        # Sem port scan e sem OS detection: ping only
         cmd.append("-sn")
 
     cmd.extend([str(network), "-oX", "-"])
@@ -165,10 +214,12 @@ def run_nmap_discovery(
     options: ScanOptions | None = None,
     timeout_seconds: int = 120,
 ) -> DiscoverResult:
-    """Executa discovery nmap com opcoes de profundidade configuráveis."""
+    """Executa discovery nmap com opções configuráveis."""
     nmap_bin = shutil.which("nmap")
     if not nmap_bin:
-        raise DiscoveryError("Comando 'nmap' não encontrado no ambiente.")
+        raise DiscoveryError(
+            "Comando 'nmap' não encontrado no ambiente."
+        )
 
     opts = options or ScanOptions()
     network = _normalize_network(network_input)
@@ -183,14 +234,22 @@ def run_nmap_discovery(
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:
-        raise DiscoveryError("Timeout no discovery. Tente uma faixa menor.") from exc
+        raise DiscoveryError(
+            "Timeout no discovery. "
+            "Tente uma faixa menor."
+        ) from exc
 
     if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip() or "Erro desconhecido ao executar nmap."
+        stderr = (
+            (proc.stderr or "").strip()
+            or "Erro desconhecido ao executar nmap."
+        )
         raise DiscoveryError(f"Falha no nmap: {stderr}")
 
     hosts = _parse_nmap_xml(proc.stdout)
-    scanned_at = datetime.now(UTC).isoformat(timespec="seconds")
+    scanned_at = datetime.now(UTC).isoformat(
+        timespec="seconds"
+    )
 
     return DiscoverResult(
         network=str(network),

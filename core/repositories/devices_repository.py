@@ -1,9 +1,14 @@
+"""
+core/repositories/devices_repository.py
+CRUD do inventário de dispositivos no SQLite.
+"""
+
 from __future__ import annotations
 
 import sqlite3
 from typing import Any
 
-from dashboard.common.constants import DB_PATH
+from core.constants import DB_PATH
 
 
 def _connect() -> sqlite3.Connection:
@@ -25,7 +30,8 @@ def ensure_inventory_table() -> None:
                 host TEXT NOT NULL,
                 port INTEGER NOT NULL,
                 active INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(customer_id, device_id),
                 UNIQUE(host, port)
             )
@@ -39,7 +45,8 @@ def list_inventory_devices() -> list[dict[str, Any]]:
     with _connect() as conn:
         rows = conn.execute(
             """
-            SELECT customer_id, device_id, vendor, host, port, active, created_at
+            SELECT customer_id, device_id, vendor,
+                   host, port, active, created_at
             FROM inventory_devices
             ORDER BY customer_id, device_id
             """
@@ -52,7 +59,8 @@ def list_active_inventory_devices() -> list[dict[str, Any]]:
     with _connect() as conn:
         rows = conn.execute(
             """
-            SELECT customer_id, device_id, vendor, host, port, active, created_at
+            SELECT customer_id, device_id, vendor,
+                   host, port, active, created_at
             FROM inventory_devices
             WHERE active = 1
             ORDER BY customer_id, device_id
@@ -71,11 +79,19 @@ def create_inventory_device(
 ) -> tuple[bool, str]:
     ensure_inventory_table()
 
-    if not customer_id.strip() or not device_id.strip() or not vendor.strip() or not host.strip():
+    if (
+        not customer_id.strip()
+        or not device_id.strip()
+        or not vendor.strip()
+        or not host.strip()
+    ):
         return False, "Preencha todos os campos obrigatórios."
 
     if port <= 0 or port > 65535:
-        return False, "Porta inválida. Informe um valor entre 1 e 65535."
+        return (
+            False,
+            "Porta inválida. Informe um valor entre 1 e 65535.",
+        )
 
     with _connect() as conn:
         by_device = conn.execute(
@@ -87,7 +103,10 @@ def create_inventory_device(
             (customer_id, device_id),
         ).fetchone()
         if by_device:
-            return False, "Dispositivo já cadastrado para este cliente."
+            return (
+                False,
+                "Dispositivo já cadastrado para este cliente.",
+            )
 
         by_host = conn.execute(
             """
@@ -98,11 +117,16 @@ def create_inventory_device(
             (host, port),
         ).fetchone()
         if by_host:
-            return False, "Já existe dispositivo cadastrado com este host/porta."
+            return (
+                False,
+                "Já existe dispositivo cadastrado com "
+                "este host/porta.",
+            )
 
         conn.execute(
             """
-            INSERT INTO inventory_devices (customer_id, device_id, vendor, host, port)
+            INSERT INTO inventory_devices
+                (customer_id, device_id, vendor, host, port)
             VALUES (?, ?, ?, ?, ?)
             """,
             (customer_id, device_id, vendor, host, port),
@@ -112,7 +136,9 @@ def create_inventory_device(
     return True, "Dispositivo cadastrado com sucesso."
 
 
-def delete_inventory_device(*, customer_id: str, device_id: str) -> None:
+def delete_inventory_device(
+    *, customer_id: str, device_id: str
+) -> None:
     ensure_inventory_table()
     with _connect() as conn:
         conn.execute(
@@ -125,7 +151,9 @@ def delete_inventory_device(*, customer_id: str, device_id: str) -> None:
         conn.commit()
 
 
-def set_inventory_device_active(*, customer_id: str, device_id: str, active: bool) -> tuple[bool, str]:
+def set_inventory_device_active(
+    *, customer_id: str, device_id: str, active: bool
+) -> tuple[bool, str]:
     ensure_inventory_table()
     with _connect() as conn:
         cursor = conn.execute(
@@ -139,19 +167,26 @@ def set_inventory_device_active(*, customer_id: str, device_id: str, active: boo
         conn.commit()
 
     if cursor.rowcount == 0:
-        return False, "Dispositivo não encontrado para atualização de status."
+        return (
+            False,
+            "Dispositivo não encontrado para atualização "
+            "de status.",
+        )
 
     if active:
         return True, "Dispositivo ativado para monitoramento."
     return True, "Dispositivo desativado do monitoramento."
 
 
-def get_inventory_device(*, customer_id: str, device_id: str) -> dict[str, Any] | None:
+def get_inventory_device(
+    *, customer_id: str, device_id: str
+) -> dict[str, Any] | None:
     ensure_inventory_table()
     with _connect() as conn:
         row = conn.execute(
             """
-            SELECT customer_id, device_id, vendor, host, port, active, created_at
+            SELECT customer_id, device_id, vendor,
+                   host, port, active, created_at
             FROM inventory_devices
             WHERE customer_id = ? AND device_id = ?
             LIMIT 1

@@ -14,8 +14,8 @@ except ModuleNotFoundError:
 
 import os
 
-from dashboard import create_app
-from dashboard.config import DevelopmentConfig, ProductionConfig
+from api import create_app
+from api.config import DevelopmentConfig, ProductionConfig
 
 _ENV_MAP = {
     "production": ProductionConfig,

@@ -18,16 +18,13 @@ Fluxo:
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, cast
 
-from core import DiffEngine
-from core.incident_engine import incident_engine
-from core.schemas import DeviceConfig
-from drivers.mikrotik_driver import MikroTikDriver
-from dashboard.repositories.devices_repository import (
+from core.repositories.devices_repository import (
     list_active_inventory_devices,
 )
+from core.services.audit_service import audit_device
+from drivers.mikrotik_driver import MikroTikDriver
 from internalloggin.logger import setup_logger
 from utils.vault import (
     CredentialNotFoundError,
@@ -38,92 +35,40 @@ from utils.vault import (
 
 logger = setup_logger(__name__)
 
-# Diretório das baselines JSON
-# inventory/baselines/<customer_id>/<device_id>.json
-_BASELINES_DIR = Path(__file__).resolve().parent / "inventory" / "baselines"
+
+# ── Ciclo de auditoria por dispositivo ───────────────
 
 
-# ── Baseline ──────────────────────────────────────────────────────────────
-
-
-def _load_baseline(customer_id: str, device_id: str) -> DeviceConfig | None:
-    """
-    Carrega e valida a baseline JSON do dispositivo indicado.
-    Retorna None se o arquivo não existir ou estiver malformado.
-    """
-    path = _BASELINES_DIR / customer_id / f"{device_id}.json"
-    if not path.exists():
-        logger.warning(
-            "Baseline não encontrada para %s/%s em '%s'.",
-            customer_id, device_id, path,
-        )
-        return None
-    try:
-        return DeviceConfig.model_validate_json(
-            path.read_text(encoding="utf-8")
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error(
-            "Falha ao carregar baseline de %s/%s: %s",
-            customer_id, device_id, exc,
-        )
-        return None
-
-
-def _save_baseline(
-    customer_id: str, device_id: str, config: DeviceConfig
+def _audit_device(
+    vault: VaultManager, device_info: dict[str, Any]
 ) -> None:
-    """Persiste configuração atual como nova baseline JSON."""
-    path = _BASELINES_DIR / customer_id / f"{device_id}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(config.model_dump_json(indent=2), encoding="utf-8")
-    logger.info("Nova baseline salva em '%s'.", path)
-
-
-# ── Ciclo de auditoria por dispositivo ───────────────────────────────────
-
-
-def _classify_severity(diff_dict: dict[str, Any]) -> str:
     """
-    Determina a severidade máxima do drift detectado.
-
-    Hierarquia (pior caso):
-        CRITICAL > HIGH > MEDIUM > LOW
-    """
-    fw = diff_dict.get("firewall_audit", {})
-    if fw.get("position_drift"):
-        return "CRITICAL"
-    if fw.get("missing_rules") or fw.get("extra_rules"):
-        return "HIGH"
-    if (
-        diff_dict.get("added")
-        or diff_dict.get("removed")
-        or diff_dict.get("modified")
-        or fw.get("parameter_drift")
-    ):
-        return "MEDIUM"
-    return "LOW"
-
-
-def _audit_device(vault: VaultManager, device_info: dict[str, Any]) -> None:
-    """
-    Executa o ciclo completo de auditoria para um único dispositivo.
+    Executa o ciclo completo de auditoria para um
+    único dispositivo.
 
     Raises:
-        VaultError: Credenciais ausentes ou cofre inacessível.
-        ConnectionError / TimeoutError: Falha de acesso SSH ao dispositivo.
+        VaultError: Credenciais ausentes ou cofre.
+        ConnectionError / TimeoutError: SSH.
         Exception: Qualquer outro erro inesperado.
     """
     customer_id: str = device_info["customer_id"]
     device_id: str = device_info["device_id"]
-    vendor: str = device_info.get("vendor", "").lower()
+    vendor: str = device_info.get(
+        "vendor", ""
+    ).lower()
 
-    logger.info("── Auditando %s / %s ──", customer_id, device_id)
+    logger.info(
+        "── Auditando %s / %s ──",
+        customer_id,
+        device_id,
+    )
 
-    # a) Credenciais via VaultManager (sem logar valores sensíveis)
-    creds = vault.get_credentials(customer_id, device_id)
+    # a) Credenciais via VaultManager
+    creds = vault.get_credentials(
+        customer_id, device_id
+    )
 
-    # b) Instancia o driver correto com base no vendor
+    # b) Instancia o driver correto
     if vendor == "mikrotik":
         driver = MikroTikDriver(
             host=creds["host"],
@@ -132,72 +77,42 @@ def _audit_device(vault: VaultManager, device_info: dict[str, Any]) -> None:
             port=int(creds.get("port", 22)),
         )
     else:
-        msg = f"Vendor '{vendor}' ainda não tem driver implementado."
+        msg = (
+            f"Vendor '{vendor}' ainda não tem "
+            "driver implementado."
+        )
         raise ValueError(msg)
 
-    # c) Coleta snapshot atual via SSH (context manager garante disconnect)
-    current = cast(DeviceConfig, None)
+    # c) Coleta snapshot atual via SSH
+    current = cast("DeviceConfig", None)
     with driver:
         current = driver.get_config_snapshot()
 
-    # type: ignore[possibly-unbound]  # current sempre existe após with
     logger.info(
         "Snapshot coletado: %s  OS=%s  modelo=%s",
-        current.hostname, current.os_version, current.model,
+        current.hostname,
+        current.os_version,
+        current.model,
     )
 
-    # d) Carrega baseline JSON
-    baseline = _load_baseline(customer_id, device_id)
-    if baseline is None:
-        logger.warning(
-            "[%s/%s] Sem baseline prévia — "
-            "snapshot salvo como referência inicial.",
-            customer_id, device_id,
-        )
-        _save_baseline(customer_id, device_id, current)
-        return
-
-    # e) Compara snapshot × baseline
-    report = DiffEngine.compare(baseline, current)
-
-    if not report.has_drift:
-        logger.info(
-            "[%s/%s] Em conformidade — nenhum desvio detectado.",
-            customer_id, device_id,
-        )
-        return
-
-    logger.warning(
-        "[%s/%s] Drift detectado — %s",
-        customer_id, device_id,
-        report.summary(),
-    )
-
-    # f) Persiste o incidente no SQLite via IncidentEngine
-    diff_dict = report.to_dict()
-    severity = _classify_severity(diff_dict)
-
-    incident_id = incident_engine.push_incident(
+    # d-f) Compara com baseline e persiste incidente
+    result = audit_device(
         customer_id=customer_id,
         device_id=device_id,
-        severity=severity,
-        category="configuration_drift",
-        description=(
-            f"Drift detectado em {baseline.hostname}: {report.summary()}"
-        ),
-        payload={
-            "diff": diff_dict,
-            "vendor": vendor,
-            "hostname": current.hostname,
-            "os_version": current.os_version,
-            "model": current.model,
-        },
+        vendor=vendor,
+        live_config=current,
     )
 
-    if incident_id:
+    if result.has_drift and result.incident_id:
         logger.error(
-            "Incidente #%d registrado [%s] para %s/%s.",
-            incident_id, severity, customer_id, device_id,
+            "Incidente #%d registrado [%s] para "
+            "%s/%s.",
+            result.incident_id,
+            result.severity.name
+            if result.severity
+            else "?",
+            customer_id,
+            device_id,
         )
 
 

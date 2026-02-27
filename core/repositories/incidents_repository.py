@@ -1,14 +1,23 @@
+"""
+core/repositories/incidents_repository.py
+Consultas e transformações de incidentes no SQLite.
+"""
+
 from __future__ import annotations
 
 import json
 import sqlite3
 from typing import Any
 
-from dashboard.common.constants import DB_PATH, OPEN_INCIDENT_STATUSES, RANK_TO_SEVERITY
-from dashboard.common.db import get_connection, query_rows
+from core.constants import (
+    DB_PATH,
+    OPEN_INCIDENT_STATUSES,
+    RANK_TO_SEVERITY,
+)
+from core.db import get_connection, query_rows
 
 
-STATUS_UI_MAP = {
+STATUS_UI_MAP: dict[str, str] = {
     "new": "novo",
     "novo": "novo",
     "em_analise": "em_analise",
@@ -20,6 +29,9 @@ STATUS_UI_MAP = {
 }
 
 
+# ── Inicialização ────────────────────────────────────────────
+
+
 def ensure_incidents_table() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
@@ -27,7 +39,8 @@ def ensure_incidents_table() -> None:
             """
             CREATE TABLE IF NOT EXISTS incidents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                timestamp DATETIME
+                    DEFAULT CURRENT_TIMESTAMP,
                 customer_id TEXT NOT NULL,
                 device_id TEXT NOT NULL,
                 severity TEXT NOT NULL,
@@ -41,10 +54,16 @@ def ensure_incidents_table() -> None:
         conn.commit()
 
 
+# ── Normalização ─────────────────────────────────────────────
+
+
 def normalize_status(status: str | None) -> str:
     if not status:
         return "novo"
-    return STATUS_UI_MAP.get(str(status).strip().lower(), str(status).strip().lower())
+    return STATUS_UI_MAP.get(
+        str(status).strip().lower(),
+        str(status).strip().lower(),
+    )
 
 
 def status_filter_values(status: str | None) -> list[str]:
@@ -54,21 +73,36 @@ def status_filter_values(status: str | None) -> list[str]:
     return [normalized]
 
 
-def normalize_diff_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
+def normalize_diff_payload(
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
     if not isinstance(payload, dict):
-        return {"diff": {"modified": {}, "added": {}, "removed": {}, "firewall_audit": {}}, "vendor": "N/A", "site": "—"}
+        return {
+            "diff": {
+                "modified": {},
+                "added": {},
+                "removed": {},
+                "firewall_audit": {},
+            },
+            "vendor": "N/A",
+            "site": "—",
+        }
 
     vendor = payload.get("vendor", "N/A")
     site = payload.get("site", "—")
 
-    if "diff" in payload and isinstance(payload.get("diff"), dict):
+    if "diff" in payload and isinstance(
+        payload.get("diff"), dict
+    ):
         diff = payload.get("diff", {})
     else:
         diff = {
             "modified": payload.get("modified", {}),
             "added": payload.get("added", {}),
             "removed": payload.get("removed", {}),
-            "firewall_audit": payload.get("firewall_audit", {}),
+            "firewall_audit": payload.get(
+                "firewall_audit", {}
+            ),
         }
 
     if not isinstance(diff.get("modified"), dict):
@@ -92,7 +126,9 @@ def row_to_incident_dict(row: Any) -> dict[str, Any]:
     data = dict(row)
     payload_raw: str | None = data.pop("payload_json", None)
     try:
-        payload_obj: dict[str, Any] = json.loads(payload_raw) if payload_raw else {}
+        payload_obj: dict[str, Any] = (
+            json.loads(payload_raw) if payload_raw else {}
+        )
     except (json.JSONDecodeError, TypeError):
         payload_obj = {}
     diff_data = normalize_diff_payload(payload_obj)
@@ -109,6 +145,9 @@ def row_to_incident_dict(row: Any) -> dict[str, Any]:
     data.setdefault("remediation", None)
     data.setdefault("history", [])
     return data
+
+
+# ── Consultas ────────────────────────────────────────────────
 
 
 def list_incidents(
@@ -140,8 +179,12 @@ def list_incidents(
             conditions.append("device_id LIKE ?")
             params.append(f"%{device_id}%")
         if vendor:
-            conditions.append("LOWER(COALESCE(payload_json, '')) LIKE ?")
-            params.append(f"%{str(vendor).strip().lower()}%")
+            conditions.append(
+                "LOWER(COALESCE(payload_json, '')) LIKE ?"
+            )
+            params.append(
+                f"%{str(vendor).strip().lower()}%"
+            )
         if severity:
             conditions.append("severity = ?")
             params.append(severity.upper())
@@ -154,7 +197,9 @@ def list_incidents(
                 "HIGH": 4,
                 "CRITICAL": 5,
             }
-            min_rank = severity_rank.get(str(min_severity).strip().upper())
+            min_rank = severity_rank.get(
+                str(min_severity).strip().upper()
+            )
             if min_rank is not None:
                 conditions.append(
                     """
@@ -173,47 +218,84 @@ def list_incidents(
         if status:
             values = status_filter_values(status)
             placeholders = ",".join("?" for _ in values)
-            conditions.append(f"LOWER(status) IN ({placeholders})")
+            conditions.append(
+                f"LOWER(status) IN ({placeholders})"
+            )
             params.extend(values)
         if start_date:
-            conditions.append("date(timestamp) >= date(?)")
+            conditions.append(
+                "date(timestamp) >= date(?)"
+            )
             params.append(start_date)
         if end_date:
-            conditions.append("date(timestamp) <= date(?)")
+            conditions.append(
+                "date(timestamp) <= date(?)"
+            )
             params.append(end_date)
 
-        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        where = (
+            ("WHERE " + " AND ".join(conditions))
+            if conditions
+            else ""
+        )
 
-        sort_clause_map = {
+        sort_map = {
             "newest": "timestamp DESC, id DESC",
             "oldest": "timestamp ASC, id ASC",
-            "severity_desc": "CASE UPPER(severity) WHEN 'CRITICAL' THEN 5 WHEN 'HIGH' THEN 4 WHEN 'MEDIUM' THEN 3 WHEN 'WARNING' THEN 2 WHEN 'LOW' THEN 1 WHEN 'INFO' THEN 0 ELSE -1 END DESC, timestamp DESC, id DESC",
-            "severity_asc": "CASE UPPER(severity) WHEN 'CRITICAL' THEN 5 WHEN 'HIGH' THEN 4 WHEN 'MEDIUM' THEN 3 WHEN 'WARNING' THEN 2 WHEN 'LOW' THEN 1 WHEN 'INFO' THEN 0 ELSE -1 END ASC, timestamp DESC, id DESC",
+            "severity_desc": (
+                "CASE UPPER(severity) "
+                "WHEN 'CRITICAL' THEN 5 "
+                "WHEN 'HIGH' THEN 4 "
+                "WHEN 'MEDIUM' THEN 3 "
+                "WHEN 'WARNING' THEN 2 "
+                "WHEN 'LOW' THEN 1 "
+                "WHEN 'INFO' THEN 0 "
+                "ELSE -1 END DESC, "
+                "timestamp DESC, id DESC"
+            ),
+            "severity_asc": (
+                "CASE UPPER(severity) "
+                "WHEN 'CRITICAL' THEN 5 "
+                "WHEN 'HIGH' THEN 4 "
+                "WHEN 'MEDIUM' THEN 3 "
+                "WHEN 'WARNING' THEN 2 "
+                "WHEN 'LOW' THEN 1 "
+                "WHEN 'INFO' THEN 0 "
+                "ELSE -1 END ASC, "
+                "timestamp DESC, id DESC"
+            ),
         }
-        order_by = sort_clause_map.get(sort, sort_clause_map["newest"])
+        order_by = sort_map.get(sort, sort_map["newest"])
 
         total: int = conn.execute(
-            f"SELECT COUNT(*) FROM incidents {where}", params
+            f"SELECT COUNT(*) FROM incidents {where}",
+            params,
         ).fetchone()[0]
 
         offset = (page - 1) * page_size
         rows = conn.execute(
             f"""
             SELECT id, timestamp, customer_id, device_id,
-                   severity, category, description, payload_json, status
+                   severity, category, description,
+                   payload_json, status
             FROM   incidents {where}
-                 ORDER  BY {order_by}
+            ORDER  BY {order_by}
             LIMIT  ? OFFSET ?
             """,
             [*params, page_size, offset],
         ).fetchall()
 
-        return [row_to_incident_dict(row) for row in rows], total
+        return (
+            [row_to_incident_dict(r) for r in rows],
+            total,
+        )
     finally:
         conn.close()
 
 
-def get_incident(incident_id: int) -> dict[str, Any] | None:
+def get_incident(
+    incident_id: int,
+) -> dict[str, Any] | None:
     ensure_incidents_table()
     conn = get_connection()
     if conn is None:
@@ -223,7 +305,8 @@ def get_incident(incident_id: int) -> dict[str, Any] | None:
         row = conn.execute(
             """
             SELECT id, timestamp, customer_id, device_id,
-                   severity, category, description, payload_json, status
+                   severity, category, description,
+                   payload_json, status
             FROM   incidents
             WHERE  id = ?
             """,
@@ -236,10 +319,13 @@ def get_incident(incident_id: int) -> dict[str, Any] | None:
 
 def count_open_by_severity() -> dict[str, int]:
     ensure_incidents_table()
-    placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
+    placeholders = ",".join(
+        "?" * len(OPEN_INCIDENT_STATUSES)
+    )
     rows = query_rows(
         f"""
-        SELECT UPPER(severity) AS sev, COUNT(*) AS cnt
+        SELECT UPPER(severity) AS sev,
+               COUNT(*) AS cnt
         FROM   incidents
         WHERE  status IN ({placeholders})
         GROUP  BY UPPER(severity)
@@ -256,7 +342,9 @@ def count_open_total() -> int:
 
 def list_distinct_open_devices() -> set[str]:
     ensure_incidents_table()
-    placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
+    placeholders = ",".join(
+        "?" * len(OPEN_INCIDENT_STATUSES)
+    )
     rows = query_rows(
         f"""
         SELECT DISTINCT device_id
@@ -268,12 +356,17 @@ def list_distinct_open_devices() -> set[str]:
     return {row["device_id"] for row in rows}
 
 
-def list_recent_open(limit: int = 5) -> list[dict[str, Any]]:
+def list_recent_open(
+    limit: int = 5,
+) -> list[dict[str, Any]]:
     ensure_incidents_table()
-    placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
+    placeholders = ",".join(
+        "?" * len(OPEN_INCIDENT_STATUSES)
+    )
     rows = query_rows(
         f"""
-        SELECT id, timestamp, customer_id, device_id, severity, category, status
+        SELECT id, timestamp, customer_id, device_id,
+               severity, category, status
         FROM incidents
         WHERE status IN ({placeholders})
         ORDER BY timestamp DESC
@@ -286,7 +379,11 @@ def list_recent_open(limit: int = 5) -> list[dict[str, Any]]:
 
 def count_by_status(status: str) -> int:
     ensure_incidents_table()
-    rows = query_rows("SELECT COUNT(*) AS cnt FROM incidents WHERE status = ?", (status,))
+    rows = query_rows(
+        "SELECT COUNT(*) AS cnt "
+        "FROM incidents WHERE status = ?",
+        (status,),
+    )
     return rows[0]["cnt"] if rows else 0
 
 
@@ -302,8 +399,10 @@ def count_validated_today() -> int:
     return rows[0]["cnt"] if rows else 0
 
 
-def list_orphan_incidents(device_ids: set[str]) -> list[dict[str, Any]]:
-    """Lista incidentes cujo device_id nao existe no inventario ativo."""
+def list_orphan_incidents(
+    device_ids: set[str],
+) -> list[dict[str, Any]]:
+    """Incidentes cujo device_id não existe no inventário."""
     ensure_incidents_table()
     conn = get_connection()
     if conn is None:
@@ -312,19 +411,27 @@ def list_orphan_incidents(device_ids: set[str]) -> list[dict[str, Any]]:
     try:
         if not device_ids:
             rows = conn.execute(
-                """SELECT id, timestamp, customer_id, device_id,
-                          severity, category, description, status
-                   FROM incidents
-                   ORDER BY timestamp DESC"""
+                """
+                SELECT id, timestamp, customer_id,
+                       device_id, severity, category,
+                       description, status
+                FROM incidents
+                ORDER BY timestamp DESC
+                """
             ).fetchall()
         else:
-            placeholders = ",".join("?" * len(device_ids))
+            placeholders = ",".join(
+                "?" * len(device_ids)
+            )
             rows = conn.execute(
-                f"""SELECT id, timestamp, customer_id, device_id,
-                           severity, category, description, status
-                    FROM incidents
-                    WHERE device_id NOT IN ({placeholders})
-                    ORDER BY timestamp DESC""",
+                f"""
+                SELECT id, timestamp, customer_id,
+                       device_id, severity, category,
+                       description, status
+                FROM incidents
+                WHERE device_id NOT IN ({placeholders})
+                ORDER BY timestamp DESC
+                """,
                 tuple(device_ids),
             ).fetchall()
 
@@ -345,8 +452,10 @@ def list_orphan_incidents(device_ids: set[str]) -> list[dict[str, Any]]:
         conn.close()
 
 
-def delete_orphan_incidents(device_ids: set[str]) -> int:
-    """Remove incidentes sem dispositivo cadastrado no inventario."""
+def delete_orphan_incidents(
+    device_ids: set[str],
+) -> int:
+    """Remove incidentes sem dispositivo no inventário."""
     ensure_incidents_table()
     conn = get_connection()
     if conn is None:
@@ -354,13 +463,18 @@ def delete_orphan_incidents(device_ids: set[str]) -> int:
 
     try:
         if not device_ids:
-            cursor = conn.execute("DELETE FROM incidents")
+            cursor = conn.execute(
+                "DELETE FROM incidents"
+            )
             conn.commit()
             return cursor.rowcount
 
-        placeholders = ",".join("?" * len(device_ids))
+        placeholders = ",".join(
+            "?" * len(device_ids)
+        )
         cursor = conn.execute(
-            f"DELETE FROM incidents WHERE device_id NOT IN ({placeholders})",
+            "DELETE FROM incidents "
+            f"WHERE device_id NOT IN ({placeholders})",
             tuple(device_ids),
         )
         conn.commit()
@@ -369,9 +483,13 @@ def delete_orphan_incidents(device_ids: set[str]) -> int:
         conn.close()
 
 
-def list_open_summary_by_device() -> dict[str, dict[str, Any]]:
+def list_open_summary_by_device() -> (
+    dict[str, dict[str, Any]]
+):
     ensure_incidents_table()
-    placeholders = ",".join("?" * len(OPEN_INCIDENT_STATUSES))
+    placeholders = ",".join(
+        "?" * len(OPEN_INCIDENT_STATUSES)
+    )
     rows = query_rows(
         f"""
         SELECT device_id,
@@ -394,7 +512,9 @@ def list_open_summary_by_device() -> dict[str, dict[str, Any]]:
 
     result: dict[str, dict[str, Any]] = {}
     for row in rows:
-        worst = RANK_TO_SEVERITY.get(row["sev_rank"], "INFO")
+        worst = RANK_TO_SEVERITY.get(
+            row["sev_rank"], "INFO"
+        )
         result[row["device_id"]] = {
             "open_incidents": row["open_incidents"],
             "worst_severity": worst,
@@ -423,7 +543,9 @@ def list_distinct_severities() -> list[str]:
         "LOW": 1,
         "INFO": 0,
     }
-    values.sort(key=lambda sev: rank.get(sev, -1), reverse=True)
+    values.sort(
+        key=lambda sev: rank.get(sev, -1), reverse=True
+    )
     return values
 
 

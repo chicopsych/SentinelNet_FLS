@@ -1,12 +1,10 @@
 import sqlite3
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, Any, Optional
-from internalloggin import logger as system_logger
 
-# Definição do caminho do banco de dados no inventário
-DB_PATH = Path(__file__).parent.parent / "inventory" / "sentinel_data.db"
+from core.constants import DB_PATH
+from internalloggin import logger as system_logger
 
 class IncidentEngine:
     """

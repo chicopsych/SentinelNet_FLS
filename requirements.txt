@@ -3,6 +3,11 @@
 # Werkzeug (dependência do Flask) fornece utilitários HTTP e WSGI.
 flask>=3.0
 
+# ─── Variáveis de Ambiente / .env ────────────────────────────────────────────
+# python-dotenv: carrega automaticamente o arquivo .env para os.environ.
+# Necessário para que SENTINEL_MASTER_KEY seja lida pelo Flask e pelo run.py.
+python-dotenv>=1.0
+
 # ─── Validação de Dados / Schemas ────────────────────────────────────────────
 # Pydantic v2: validação de modelos, tipagem estática em runtime e serialização
 # JSON nativa. A v2 foi reescrita em Rust (via pydantic-core) e tem uma API

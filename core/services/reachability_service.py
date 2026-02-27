@@ -1,17 +1,30 @@
+"""
+core/services/reachability_service.py
+Testes de conectividade: ICMP (ping) e SNMP.
+
+Agnóstico à interface — usado pelo CLI e pela API web.
+"""
+
 from __future__ import annotations
 
 import importlib
 import subprocess
 from typing import Any
 
-from utils.vault import MasterKeyNotFoundError, VaultError, VaultManager
+from utils.vault import (
+    MasterKeyNotFoundError,
+    VaultError,
+    VaultManager,
+)
 
 _SNMP_SYS_DESCR_OID = "1.3.6.1.2.1.1.1.0"
 
 
-def load_snmp_communities() -> dict[tuple[str, str], str]:
+def load_snmp_communities() -> (
+    dict[tuple[str, str], str]
+):
     """
-    Carrega o campo snmp_community do cofre, sem expor segredos.
+    Carrega snmp_community do cofre, sem expor segredos.
 
     Retorna dict {(customer_id, device_id): community}.
     """
@@ -30,17 +43,28 @@ def load_snmp_communities() -> dict[tuple[str, str], str]:
                 continue
             community = data.get("snmp_community")
             if community:
-                communities[(customer_id, device_id)] = str(community)
+                communities[
+                    (customer_id, device_id)
+                ] = str(community)
     return communities
 
 
-def ping_host(host: str, timeout: int = 1) -> bool:
-    """Retorna True se houver resposta ICMP do host."""
+def ping_host(
+    host: str, timeout: int = 1
+) -> bool:
+    """Retorna True se houver resposta ICMP."""
     if not host:
         return False
     try:
         result = subprocess.run(
-            ["ping", "-c", "1", "-W", str(timeout), host],
+            [
+                "ping",
+                "-c",
+                "1",
+                "-W",
+                str(timeout),
+                host,
+            ],
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -57,7 +81,7 @@ def snmp_get_sysdescr(
     timeout: int = 1,
     port: int = 161,
 ) -> bool | None:
-    """Executa um SNMP GET (sysDescr.0). Retorna True se houver resposta."""
+    """SNMP GET sysDescr.0. True se houver resposta."""
     if not host or not community:
         return False
     try:
@@ -76,12 +100,18 @@ def snmp_get_sysdescr(
         iterator = getCmd(
             SnmpEngine(),
             CommunityData(community, mpModel=1),
-            UdpTransportTarget((host, port), timeout=timeout, retries=0),
+            UdpTransportTarget(
+                (host, port),
+                timeout=timeout,
+                retries=0,
+            ),
             ContextData(),
-            ObjectType(ObjectIdentity(_SNMP_SYS_DESCR_OID)),
+            ObjectType(
+                ObjectIdentity(_SNMP_SYS_DESCR_OID)
+            ),
         )
-        error_indication, error_status, _, _ = next(iterator)
-        if error_indication or error_status:
+        err_ind, err_st, _, _ = next(iterator)
+        if err_ind or err_st:
             return False
     except Exception:
         return False
@@ -95,11 +125,13 @@ def check_device_reachability(
     snmp_community: str | None,
     timeout: int = 1,
 ) -> dict[str, Any]:
-    """Retorna status de ping e SNMP para um dispositivo."""
+    """Retorna status de ping e SNMP para um ativo."""
     ping_ok = ping_host(host, timeout=timeout)
     snmp_ok: bool | None = None
     if snmp_community:
-        snmp_ok = snmp_get_sysdescr(host, snmp_community, timeout=timeout)
+        snmp_ok = snmp_get_sysdescr(
+            host, snmp_community, timeout=timeout
+        )
 
     is_warning = (not ping_ok) or (snmp_ok is False)
     return {
