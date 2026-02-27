@@ -141,3 +141,10 @@ pip-log.txt
 pip-delete-this-directory.txt
 .Python
 pip.log
+
+# ────────── GERENCIAMENTO: Arquivos pessoais não versionados ────────────
+# Controle interior do projeto (status, roadmap, decisões, contexto com IA)
+PROJECT_CONTROL.md
+
+# Chat/contexto com IA (arquivo pessoal)
+conversa-com-ia.txt
