@@ -1,218 +1,70 @@
 # 🛰️ SentinelNet_FLS
 
-**Monitoramento de Integridade Configuracional para Redes Críticas**
+## *Enterprise-Grade Configuration Integrity & Network Compliance Orchestrator*
+
+![Python Version](https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge&logo=python)
+![Architecture](https://img.shields.io/badge/Architecture-Strategy%20Pattern-orange?style=for-the-badge)
+![Security](https://img.shields.io/badge/Security-AES%20Fernet-green?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-lightgrey?style=for-the-badge)
+
+[cite_start]**SentinelNet_FLS** é uma plataforma avançada de auditoria contínua e observabilidade configuracional[cite: 163, 195]. [cite_start]Projetado para ambientes de missão crítica, ele implementa os princípios de **Infrastructure as Code (IaC)** para detectar e mitigar o *Configuration Drift* através de uma arquitetura resiliente e agnóstica a fabricantes[cite: 4, 7, 56, 165].
 
 ---
 
-## 📋 O que é?
+## 💎 Proposta de Valor: A "Fonte Única da Verdade"
 
-**SentinelNet_FLS** é uma ferramenta de auditoria contínua que detecta **Configuration Drift** em ambientes de rede, comparando o estado real dos equipamentos com uma **Fonte Única da Verdade (Baseline)** definida em JSON e versionada em Git.
+[cite_start]Em redes modernas, o maior risco de segurança é o ajuste temporário que se torna permanente[cite: 16]. [cite_start]O SentinelNet estabelece uma **Baseline Imutável** (Golden Config), garantindo que qualquer alteração não documentada seja detectada, categorizada e neutralizada[cite: 3, 55, 164, 196].
 
-### Propósito
-
-- Automatizar detecção de alterações não autorizadas em ativos críticos
-- Gerar trilha de auditoria para conformidade regulatória
-- Reduzir riscos de segurança causados por mudanças manuais fora de processo
-- Facilitar rastreabilidade multi-cliente em ambientes de MSP
-
-### Use Cases
-
-- **MSP (Managed Service Providers):** auditoria contínua de múltiplos clientes
-- **Consultorias de TI:** validação pós-implementação e conformidade operacional
-- **Equipes de Infraestrutura:** detecção automática de Configuration Drift
-- **DevOps/NetOps:** IaC para redes (Network as Code principles)
+* [cite_start]**Integridade Operacional:** Elimine falhas causadas por comandos manuais fora da janela de manutenção[cite: 166, 198].
+* **Segurança Ofensiva (Red Team):** Detecte imediatamente backdoors e regras de firewall suspeitas[cite: 165, 197].
+* [cite_start]**Compliance Multitenancy:** Gerencie múltiplos clientes (MSPs) com isolamento total de dados e segredos[cite: 32, 173, 210].
 
 ---
 
-## 🔄 Como Funciona
+## ⚙️ Arquitetura de Próxima Geração
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                                                         │
-│  1. INVENTÁRIO (JSON / SQLite)                         │
-│     └─ Define dispositivos, clientes, credenciais      │
-│                                                         │
-│  2. COLETA (SSH/API via Driver)                        │
-│     └─ Conecta aos ativos, extrai running config      │
-│                                                         │
-│  3. PARSING (TTP/TextFSM)                              │
-│     └─ Converte CLI textual em JSON estruturado        │
-│                                                         │
-│  4. DIFF (Comparison Engine)                           │
-│     └─ Baseline vs Estado Atual → Desvios             │
-│                                                         │
-│  5. AUDITORIA (SQLite + Relatórios)                   │
-│     └─ Persiste incidentes com contexto e severidade   │
-│                                                         │
-│  6. DASHBOARD (Flask Web UI)                           │
-│     └─ Operadores visualizam, aprovam e remediam       │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
+[cite_start]O sistema foi concebido sobre camadas desacopladas, garantindo que o núcleo permaneça estável enquanto novos fabricantes são adicionados via plugins[cite: 30, 61, 170, 207].
 
-### Stack Técnica
+### O Ciclo de Vida do Dado
 
-- **Python 3.10+** — Tipagem estática, PEP8
-- **Netmiko** — Coleta via SSH
-- **TTP** — Parsing de CLI para JSON
-- **Pydantic** — Validação de schema
-- **Flask** — API e Dashboard
-- **SQLite** — Histórico e persistência
-- **Fernet** — Criptografia de credenciais
+1. [cite_start]**Ingestion Layer:** Drivers especializados (Netmiko) realizam a coleta segura via SSH utilizando validação de fingerprint para mitigar ataques MITM[cite: 9, 57, 65, 171].
+2. [cite_start]**Normalization Layer:** Motores **TTP (Template Text Parser)** convertem o caos textual da CLI em objetos JSON estruturados e tipados[cite: 40, 58, 63, 171].
+3. [cite_start]**Analysis Engine:** O **Diff Engine Semântico** realiza a comparação lógica bit-a-bit, tratando listas de firewall não apenas como texto, mas como regras ordenadas[cite: 11, 59, 171, 232, 255].
+4. [cite_start]**Persistence Layer:** O **Incident Engine** registra desvios no SQLite, mantendo uma trilha histórica para auditoria e remediação futura[cite: 74, 172, 321, 343].
 
 ---
 
-## 🚀 QuickStart
+## 🛡️ O Modelo de Segurança "Sentinel"
 
-### 1. Pré-requisitos
+Segurança não é um recurso, é a fundação. [cite_start]O SentinelNet implementa um cofre de credenciais rigoroso[cite: 43, 66, 210, 281].
 
-- Python 3.10+
-- Acesso SSH (read-only) aos dispositivos alvo
-- Git (para versionamento de baselines)
-
-### 2. Instalação
-
-```bash
-# Clonar repositório
-git clone https://github.com/chicopsych/SentinelNet_FLS.git
-cd SentinelNet_FLS
-
-# Criar e ativar ambiente virtual
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou
-venv\Scripts\activate  # Windows
-
-# Instalar dependências
-pip install -r requirements.txt
-```
-
-### 3. Configuração Segura de Credenciais
-
-```bash
-# Gerar Master Key para criptografia
-python3 -c "
-from cryptography.fernet import Fernet
-import os
-
-key = Fernet.generate_key().decode()
-with open('.env', 'w') as f:
-    f.write(f'SENTINEL_MASTER_KEY={key}\n')
-print(f'✅ Master Key criada:\n{key[:30]}...')
-"
-
-# Verificar carregamento
-python3 -c "
-from dotenv import load_dotenv
-import os
-load_dotenv()
-key = os.getenv('SENTINEL_MASTER_KEY')
-print(f'✅ Carregado: {key[:30]}...' if key else '❌ Não encontrado')
-"
-```
-
-### 4. Iniciar Dashboard
-
-```bash
-# Desenvolvimento (com hot-reload)
-python run.py
-# Acesse: http://127.0.0.1:5000
-
-# Produção (debug desativado)
-FLASK_ENV=production python run.py
-```
-
-### 5. Usar via Dashboard
-
-1. **Descobrir Ativos:** `GET /devices/discover` → insira faixa CIDR
-2. **Cadastrar Dispositivo:** `GET /devices/onboard` → preencha dados + credenciais
-3. **Executar Auditoria:** `main.py` coleta configs no background
-4. **Visualizar Incidentes:** `GET /incidents` → filtre por severidade, cliente
-5. **Remediar:** Clique em incidente → visualize diff → aprove correção
-
-### 6. Executar Auditoria CLI (opcional)
-
-```bash
-# Coleta, parseia e compara com baseline
-python main.py
-
-# Resultados em: logs/, inventory/reports/
-```
+* [cite_start]**Criptografia em Repouso:** Todas as credenciais de ativos são protegidas com **AES-128 via Fernet (Cryptography)**[cite: 284, 289, 300].
+* **Injeção Dinâmica:** A chave mestra de descriptografia (`SENTINEL_MASTER_KEY`) reside apenas na memória volátil, injetada via variáveis de ambiente[cite: 285, 292, 299].
+* [cite_start]**Zero-Logging Policy:** Logs internos são sanitizados automaticamente para evitar o vazamento inadvertido de credenciais ou tokens[cite: 32, 293, 301].
 
 ---
 
-## 📁 Estrutura Básica
+## 🚀 Tecnologias Core
 
-- **`core/`** — Schemas, diff engine, auditoria
-- **`drivers/`** — Implementações por fabricante (MikroTik, etc.)
-- **`dashboard/`** — API Flask + templates web
-- **`inventory/`** — Baselines JSON, credenciais criptografadas
-- **`templates/`** — Parsers TTP para cada comando
-- **`main.py`** — Ponto de entrada CLI
-- **`run.py`** — Ponto de entrada Dashboard
+[cite_start]O projeto utiliza o que há de mais estável e performático no ecossistema Python moderno[cite: 171, 208]:
 
----
-
-## 🛡️ Segurança
-
-- ✅ Credenciais **criptografadas** com Fernet (no arquivo `vault.enc`)
-- ✅ Master Key via **variável de ambiente** (`.env`)
-- ✅ **Zero hardcoding** de secrets no repositório
-- ✅ **Git hooks** bloqueiam commit de secrets
-- ✅ **Logs sanitizados** (sem exposição de senhas)
-- ✅ **Mínimo privilégio** — contas read-only recomendadas
-
-Para detalhes, consulte [SECURITY.md](SECURITY.md) e [docs/configuracao-vault.md](docs/configuracao-vault.md).
+| Tecnologia | Função | Vantagem Estratégica |
+| :--- | :--- | :--- |
+| **Pydantic** | Validação de Schema | [cite_start]Garante integridade dos dados antes da auditoria[cite: 88, 171, 199]. |
+| **Netmiko** | Orquestração SSH | [cite_start]Abstração estável para comunicação multi-vendor[cite: 9, 171, 209]. |
+| **TTP** | Parsing Declarativo | [cite_start]Manutenção simples: mude o template, não o código[cite: 42, 112, 171]. |
+| **Flask + BS5** | Dashboard Full-stack | [cite_start]Interface executiva com foco em UX e acessibilidade[cite: 329, 435, 436]. |
 
 ---
 
-## 📌 Endpoints Principais
+## 📂 Organização do Projeto
 
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| `GET` | `/health/overview` | Painel executivo com KPIs |
-| `GET` | `/devices` | Lista de ativos cadastrados |
-| `POST` | `/devices/discover` | Discovery de ativos (nmap) |
-| `POST` | `/devices/onboard` | Cadastrar novo ativo |
-| `GET` | `/incidents` | Lista de desvios detectados |
-| `GET` | `/incidents/<id>` | Detalhe com diff baseline vs atual |
-| `POST` | `/incidents/<id>/remediation/ui/approve` | Aprovar correção |
-| `POST` | `/incidents/<id>/remediation/ui/execute` | Executar remediação |
-
----
-
-## 🔧 Próximos Passos
-
-1. **Adicionar baseline para seus ativos:**
-   ```bash
-   cp inventory/baselines/cliente_a/borda-01.json inventory/baselines/seu_cliente/seu_ativo.json
-   # Editar com valores esperados
-   ```
-
-2. **Cadastrar ativos no dashboard** via `/devices/onboard`
-
-3. **Executar primeira auditoria:**
-   ```bash
-   python main.py
-   ```
-
-4. **Visualizar resultados** em `http://127.0.0.1:5000/incidents`
-
----
-
-## 📚 Documentação Completa
-
-Para detalhes sobre arquitetura, roadmap, fases do dashboard, integração com IA e tarefas em andamento, consulte **[PROJECT_CONTROL.md](PROJECT_CONTROL.md)** (arquivo pessoal de gerenciamento do projeto).
-
-- [SECURITY.md](SECURITY.md) — Políticas e controles de segurança
-- [docs/configuracao-vault.md](docs/configuracao-vault.md) — Setup completo do cofre de credenciais
-
----
-
-## 📄 Licença
-
-Distribuído sob a licença **MIT**. Ver arquivo [LICENSE](LICENSE).
-
----
-
-**Desenvolvido com foco em auditoria contínua, segurança de credenciais e rastreabilidade operacional.**
+```text
+SentinelNet_FLS/
+├── core/               # Inteligência de auditoria, serviços e contratos (ABC)
+├── drivers/            # Abstrações de hardware (MikroTik, Cisco, etc)
+├── dashboard/          # Interface Frontend Web (Templates & Static)
+├── web_api/            # Camada de Controllers e API Flask
+├── internalloggin/     # Observabilidade com RotatingFileHandler
+├── inventory/          # Baselines imutáveis, SQLite e segredos criptografados
+└── templates/          # Inteligência de parsing (TTP Templates)
