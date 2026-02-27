@@ -18,6 +18,7 @@ from core.repositories.devices_repository import (
 from core.repositories.incidents_repository import (
     list_open_summary_by_device,
 )
+from core.services.audit_service import load_baseline
 from core.services.reachability_service import (
     check_device_reachability,
     load_snmp_communities,
@@ -93,6 +94,7 @@ def get_devices_with_status(
                 "warning": False,
             }
 
+        bl = load_baseline(cid, device_id)
         devices.append(
             {
                 "device_id": device_id,
@@ -109,6 +111,12 @@ def get_devices_with_status(
                 "active": bool(entry.get("active", 1)),
                 "ping_ok": reach.get("ping_ok"),
                 "snmp_ok": reach.get("snmp_ok"),
+                "has_baseline": bl is not None,
+                "baseline_at": (
+                    bl.collected_at.isoformat()
+                    if bl is not None
+                    else None
+                ),
             }
         )
 
@@ -152,11 +160,11 @@ def get_device_detail(
             "warning": False,
         }
 
+    customer_id = entry.get("customer_id", "")
+    bl = load_baseline(customer_id, device_id)
     return {
         "device_id": device_id,
-        "customer_id": entry.get(
-            "customer_id", "—"
-        ),
+        "customer_id": customer_id or "—",
         "vendor": entry.get("vendor", "—"),
         "open_incidents": inc.get(
             "open_incidents", 0
@@ -169,4 +177,10 @@ def get_device_detail(
         "active": bool(entry.get("active", 1)),
         "ping_ok": reach.get("ping_ok"),
         "snmp_ok": reach.get("snmp_ok"),
+        "has_baseline": bl is not None,
+        "baseline_at": (
+            bl.collected_at.isoformat()
+            if bl is not None
+            else None
+        ),
     }

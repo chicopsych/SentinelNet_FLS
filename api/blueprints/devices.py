@@ -34,6 +34,9 @@ from core.repositories.devices_repository import (
     get_inventory_device,
     set_inventory_device_active,
 )
+from core.services.audit_service import (
+    capture_initial_baseline,
+)
 from core.services.device_service import (
     get_device_detail,
     get_devices_with_status,
@@ -229,8 +232,21 @@ def onboard_device():
                     "danger",
                 )
             else:
+                b_ok, b_msg = capture_initial_baseline(
+                    customer_id=customer,
+                    device_id=device,
+                    vendor=vendor,
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                )
                 flash(message, "success")
                 flash(cred_msg, "info")
+                flash(
+                    b_msg,
+                    "success" if b_ok else "warning",
+                )
                 return render_template(
                     "devices_onboard.html",
                     form={

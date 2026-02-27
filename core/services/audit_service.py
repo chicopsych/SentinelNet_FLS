@@ -90,6 +90,73 @@ def save_baseline(
     logger.info("Nova baseline salva em '%s'.", path)
 
 
+def capture_initial_baseline(
+    *,
+    customer_id: str,
+    device_id: str,
+    vendor: str,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+) -> tuple[bool, str]:
+    """
+    Tenta conectar ao dispositivo e salvar baseline inicial.
+
+    Não sobrescreve baseline existente.
+    Falhas de conexão não levantam exceção — retornam (False, msg).
+    Retorna (sucesso: bool, mensagem: str).
+    """
+    if load_baseline(customer_id, device_id) is not None:
+        return True, "Baseline já existente — mantida sem alteração."
+
+    # Import local para evitar importação circular com drivers/
+    from drivers.mikrotik_driver import MikroTikDriver  # noqa: PLC0415
+
+    _DRIVER_MAP: dict[str, Any] = {
+        "mikrotik": MikroTikDriver,
+    }
+
+    driver_cls = _DRIVER_MAP.get(vendor.lower())
+    if driver_cls is None:
+        logger.warning(
+            "[%s/%s] Vendor '%s' sem driver — baseline pendente.",
+            customer_id,
+            device_id,
+            vendor,
+        )
+        return (
+            False,
+            f"Vendor '{vendor}' sem driver implementado — "
+            "baseline será criada na primeira auditoria.",
+        )
+
+    try:
+        driver = driver_cls(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+        )
+        with driver:
+            live_config = driver.get_config_snapshot()
+        save_baseline(customer_id, device_id, live_config)
+        logger.info(
+            "[%s/%s] Baseline inicial capturada durante onboarding.",
+            customer_id,
+            device_id,
+        )
+        return True, "Baseline inicial capturada com sucesso."
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[%s/%s] Falha ao capturar baseline no onboarding: %s",
+            customer_id,
+            device_id,
+            exc,
+        )
+        return False, f"Baseline pendente: {exc}"
+
+
 # ── Auditoria ────────────────────────────────────────────────
 
 
