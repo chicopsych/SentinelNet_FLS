@@ -124,6 +124,7 @@
   function applyData(data) {
     setText("kpi-devices-total", data.devices.total);
     setText("kpi-devices-healthy", data.devices.healthy);
+    setText("kpi-devices-warning", data.devices.warning ?? 0);
     setText("kpi-devices-incident", data.devices.with_incident);
     setText("kpi-inc-open", data.incidents.open);
     setText("kpi-inc-critical", data.incidents.critical);

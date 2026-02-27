@@ -136,6 +136,18 @@ Esse modelo é especialmente útil para MSPs, consultorias de TI e equipes de in
   - Persistência de incidentes com `payload_json`
   - Pronto para alimentar dashboard e histórico operacional
 
+- **Monitoramento de Alcançabilidade (`dashboard/services/reachability.py`)**
+  - Verificação de disponibilidade via ICMP (ping) e SNMP a cada requisição
+  - `snmp_get_sysdescr()` lê OID `1.3.6.1.2.1.1.1.0` usando `pysnmp`
+  - Community SNMP armazenada no cofre Fernet por dispositivo (`snmp_community`)
+  - Dispositivos sem resposta são marcados automaticamente como `warning` no dashboard
+  - Import condicional do `pysnmp` via `importlib` para não travar o servidor se o pacote não estiver instalado
+
+- **Blueprint Admin (`dashboard/blueprints/admin.py`)**
+  - `GET /admin/orphan-incidents` — lista incidentes sem dispositivo cadastrado
+  - `POST /admin/orphan-incidents/purge` — limpeza manual com confirmação e token de administrador
+  - Limpeza automática também é realizada a cada carregamento da overview
+
 - **Stress Test (`stress_test.py`)**
   - Geração de incidentes simulados realistas para validar dashboard e consultas
   - Cenários para drift escalar e auditoria de firewall
@@ -195,6 +207,7 @@ O projeto segue o padrão **Strategy**, mantendo o núcleo desacoplado das parti
 - **Pydantic** (validação de schema)
 - **Flask** (API e backend do dashboard)
 - **SQLite** (opcional para histórico)
+- **pysnmp** (sondagem SNMP para monitoramento de alcançabilidade)
 - **Logging nativo do Python + RotatingFileHandler** (observabilidade básica)
 
 ---
@@ -237,7 +250,8 @@ SentinelNet_FLS/
 │   │   ├── health.py           # GET /health/overview
 │   │   ├── devices.py          # GET /devices
 │   │   ├── incidents.py        # GET /incidents
-│   │   └── remediation.py      # POST /incidents/<id>/remediation/*
+│   │   ├── remediation.py      # POST /incidents/<id>/remediation/*
+│   │   └── admin.py            # GET/POST /admin/orphan-incidents
 │   ├── common/                 # Helpers compartilhados (HTTP, DB, constantes)
 │   │   ├── __init__.py
 │   │   ├── constants.py
@@ -329,6 +343,8 @@ FLASK_ENV=production python run.py
 - `GET /incidents/` e `GET /incidents/<incident_id>`
 - Filtros de `/incidents/`: `customer`, `device_id`, `vendor`, `severity`, `min_severity`, `status`, `start_date`, `end_date`, `sort`, `page`
 - Compatibilidade de status legado em incidentes: `new` é normalizado para `novo` na UI/API
+- `GET /admin/orphan-incidents` → lista incidentes órfãos (HTML/JSON)
+- `POST /admin/orphan-incidents/purge` → limpeza manual com token admin (form: `admin_token`, `confirm=yes`)
 - `GET /auth/verify` (protegido por token)
 - `POST /incidents/<incident_id>/remediation/ui/suggest` (UI)
 - `POST /incidents/<incident_id>/remediation/ui/approve` (UI)

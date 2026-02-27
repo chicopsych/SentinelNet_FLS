@@ -15,6 +15,7 @@ from .blueprints.health import health_bp
 from .blueprints.devices import devices_bp
 from .blueprints.incidents import incidents_bp
 from .blueprints.remediation import remediation_bp
+from .blueprints.admin import admin_bp
 
 
 def create_app(config_class=DevelopmentConfig) -> Flask:
@@ -33,6 +34,7 @@ def create_app(config_class=DevelopmentConfig) -> Flask:
     app.register_blueprint(devices_bp,     url_prefix="/devices")
     app.register_blueprint(incidents_bp,   url_prefix="/incidents")
     app.register_blueprint(remediation_bp, url_prefix="/incidents")
+    app.register_blueprint(admin_bp,       url_prefix="/admin")
 
     # ── Rota raiz ─────────────────────────────────────────────────────────────
     @app.get("/")

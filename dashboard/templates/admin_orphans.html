@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Admin — Incidentes Órfãos — SentinelNet{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h4 mb-0">
+    <i class="bi bi-shield-exclamation me-2 text-warning"></i>Limpeza de Incidentes Órfãos
+  </h1>
+  <a href="{{ url_for('devices.list_devices') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar a Dispositivos
+  </a>
+</div>
+
+<!-- Contexto -->
+<div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+  <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
+  <div>
+    <strong>O que são incidentes órfãos?</strong><br>
+    São registros de incidentes cujo <code>device_id</code> não existe mais na tabela de
+    inventário (<code>inventory_devices</code>). Isso pode ocorrer quando um dispositivo é
+    removido do inventário após incidentes já terem sido gerados para ele.
+    <br>
+    <small class="text-muted mt-1 d-block">
+      Dispositivos registrados no inventário: <strong>{{ registered_devices }}</strong> &nbsp;|&nbsp;
+      Incidentes órfãos encontrados: <strong>{{ count }}</strong>
+    </small>
+    <small class="text-muted mt-1 d-block">
+      <i class="bi bi-recycle me-1"></i>A limpeza automática também é executada sempre que a
+      <a href="{{ url_for('health.overview') }}">tela de overview</a> é carregada.
+    </small>
+  </div>
+</div>
+
+{% if not orphans %}
+<!-- Empty state -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+    <p class="mb-0 fw-semibold">Nenhum incidente órfão encontrado.</p>
+    <p class="small mt-1">O banco de dados está consistente com o inventário atual.</p>
+  </div>
+</div>
+{% else %}
+
+<!-- Tabela de órfãos -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">
+      <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
+      {{ count }} incidente(s) órfão(s)
+    </span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Timestamp</th>
+            <th>device_id (ausente)</th>
+            <th>Cliente</th>
+            <th>Severidade</th>
+            <th>Categoria</th>
+            <th>Status</th>
+            <th>Descrição</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inc in orphans %}
+          <tr>
+            <td class="text-muted small">{{ inc.id }}</td>
+            <td class="text-muted small text-nowrap">
+              {{ (inc.timestamp or '—') | string | replace('T', ' ') | truncate(19, True, '') }}
+            </td>
+            <td>
+              <code class="text-danger">{{ inc.device_id or '—' }}</code>
+            </td>
+            <td>{{ inc.customer_id or '—' }}</td>
+            <td>
+              {% if inc.severity %}
+                {% set severity = inc.severity %}
+                {% include "partials/_severity_badge.html" %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="small">{{ inc.category or '—' }}</td>
+            <td>
+              <span class="badge bg-secondary">{{ inc.status or '—' }}</span>
+            </td>
+            <td class="small text-muted" style="max-width:260px;">
+              {{ (inc.description or '—') | truncate(90) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Formulário de limpeza com confirmação -->
+<div class="card border-danger border-2 shadow-sm mb-4">
+  <div class="card-header bg-danger bg-opacity-10 text-danger fw-semibold">
+    <i class="bi bi-trash3 me-1"></i>Confirmar Limpeza
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Esta ação removerá permanentemente os <strong>{{ count }} incidente(s)</strong> listados
+      acima. A operação <strong>não pode ser desfeita</strong>. Incidentes de dispositivos
+      cadastrados <em>não serão</em> afetados.
+    </p>
+
+    <form method="post" action="{{ url_for('admin.purge_orphans') }}">
+
+      <!-- Token de administrador -->
+      <div class="mb-3">
+        <label for="admin_token" class="form-label fw-semibold">
+          <i class="bi bi-key me-1"></i>Token de Administrador
+        </label>
+        <input
+          type="password"
+          id="admin_token"
+          name="admin_token"
+          class="form-control"
+          placeholder="Insira o token de administrador (API_STATIC_TOKEN)"
+          autocomplete="off"
+        />
+        <div class="form-text">
+          Corresponde ao valor de <code>API_STATIC_TOKEN</code> configurado no servidor.
+          Se não estiver configurado, deixe em branco.
+        </div>
+      </div>
+
+      <!-- Checkbox de confirmação -->
+      <div class="mb-4 form-check">
+        <input
+          type="checkbox"
+          class="form-check-input"
+          id="confirm_check"
+          name="confirm"
+          value="yes"
+        />
+        <label class="form-check-label text-danger fw-semibold" for="confirm_check">
+          Confirmo que desejo remover permanentemente os {{ count }} incidente(s) órfão(s).
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-danger">
+        <i class="bi bi-trash3 me-1"></i>Executar Limpeza
+      </button>
+      <a href="{{ url_for('admin.list_orphans') }}" class="btn btn-outline-secondary ms-2">
+        Cancelar
+      </a>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

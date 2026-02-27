@@ -98,6 +98,18 @@
                 {% include "partials/_status_badge.html" %}
               {% endif %}
               {% set color = none %}
+              {% if dev.active %}
+                {% if dev.ping_ok == false %}
+                  <span class="badge bg-warning text-dark ms-1" title="Sem resposta ICMP (ping)">
+                    <i class="bi bi-reception-0 me-1"></i>ping
+                  </span>
+                {% endif %}
+                {% if dev.snmp_ok == false %}
+                  <span class="badge bg-warning text-dark ms-1" title="Sem resposta SNMP">
+                    <i class="bi bi-broadcast me-1"></i>SNMP
+                  </span>
+                {% endif %}
+              {% endif %}
             </td>
 
             <td class="fw-semibold">{{ dev.device_id }}</td>

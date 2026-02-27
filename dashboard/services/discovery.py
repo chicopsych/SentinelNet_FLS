@@ -6,7 +6,7 @@ import ipaddress
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 
@@ -15,13 +15,29 @@ class DiscoveryError(RuntimeError):
 
 
 @dataclass(slots=True)
+class ScanOptions:
+    """Opcoes de profundidade de varredura para o nmap."""
+
+    # Descoberta de hosts ativos (sempre executada)
+    ping_only: bool = True
+    # Portas: top 100 (rapido) ou top 1000 (detalhado)
+    ports_fast: bool = False      # -F  (top 100 portas)
+    ports_extended: bool = False  # --top-ports 1000
+    # Deteccao de sistema operacional (-O, requer root/sudo)
+    os_detection: bool = False
+    # Deteccao de versao de servicos (-sV)
+    service_version: bool = False
+
+
+@dataclass(slots=True)
 class DiscoverResult:
     """Resultado de uma execução de discovery."""
 
     network: str
     scanned_at: str
-    hosts: list[dict[str, str | None]]
+    hosts: list[dict[str, object]]
     total_hosts: int
+    scan_options: ScanOptions = field(default_factory=ScanOptions)
 
 
 def _normalize_network(network_input: str) -> ipaddress.IPv4Network:
@@ -39,13 +55,45 @@ def _normalize_network(network_input: str) -> ipaddress.IPv4Network:
     return network
 
 
-def _parse_nmap_xml(xml_content: str) -> list[dict[str, str | None]]:
+def _parse_ports(host_node: ET.Element) -> list[str]:
+    """Extrai lista de portas abertas de um no <host> do XML nmap."""
+    open_ports: list[str] = []
+    ports_node = host_node.find("ports")
+    if ports_node is None:
+        return open_ports
+    for port in ports_node.findall("port"):
+        state = port.find("state")
+        if state is None or state.attrib.get("state") != "open":
+            continue
+        portid = port.attrib.get("portid", "?")
+        proto = port.attrib.get("protocol", "tcp")
+        svc = port.find("service")
+        svc_name = svc.attrib.get("name", "") if svc is not None else ""
+        entry = f"{portid}/{proto} ({svc_name})" if svc_name else f"{portid}/{proto}"
+        open_ports.append(entry)
+    return open_ports
+
+
+def _parse_os(host_node: ET.Element) -> str | None:
+    """Extrai o melhor match de SO de um no <host> do XML nmap."""
+    os_node = host_node.find("os")
+    if os_node is None:
+        return None
+    best = os_node.find("osmatch")
+    if best is None:
+        return None
+    name = best.attrib.get("name", "")
+    accuracy = best.attrib.get("accuracy", "")
+    return f"{name} ({accuracy}%)" if accuracy else name or None
+
+
+def _parse_nmap_xml(xml_content: str) -> list[dict[str, object]]:
     try:
         root = ET.fromstring(xml_content)
     except ET.ParseError as exc:
         raise DiscoveryError("Saída XML do nmap inválida.") from exc
 
-    hosts: list[dict[str, str | None]] = []
+    hosts: list[dict[str, object]] = []
     for host in root.findall("host"):
         status = host.find("status")
         if status is None or status.attrib.get("state") != "up":
@@ -75,19 +123,56 @@ def _parse_nmap_xml(xml_content: str) -> list[dict[str, str | None]]:
                 "hostname": hostname,
                 "mac": mac,
                 "vendor": vendor,
+                "ports": _parse_ports(host),
+                "os": _parse_os(host),
             })
 
-    return sorted(hosts, key=lambda item: item["ip"] or "")
+    return sorted(hosts, key=lambda item: str(item.get("ip") or ""))
 
 
-def run_nmap_discovery(network_input: str, timeout_seconds: int = 120) -> DiscoverResult:
-    """Executa discovery por ping scan (`nmap -sn`) em uma faixa de rede."""
+def _build_command(
+    nmap_bin: str,
+    network: ipaddress.IPv4Network,
+    opts: ScanOptions,
+) -> list[str]:
+    """Monta o comando nmap com base nas opcoes de scan escolhidas."""
+    cmd = [nmap_bin, "-n"]
+
+    needs_port_scan = opts.ports_fast or opts.ports_extended or opts.service_version
+
+    if opts.os_detection:
+        # -O requer scan TCP (-sS/-sT); inclui descoberta de host
+        cmd.append("-O")
+
+    if opts.service_version:
+        cmd.append("-sV")
+
+    if needs_port_scan:
+        if opts.ports_extended:
+            cmd.extend(["--top-ports", "1000"])
+        else:
+            cmd.append("-F")   # top 100 portas (rapido)
+    elif not opts.os_detection:
+        # Sem port scan e sem OS detection: ping only
+        cmd.append("-sn")
+
+    cmd.extend([str(network), "-oX", "-"])
+    return cmd
+
+
+def run_nmap_discovery(
+    network_input: str,
+    options: ScanOptions | None = None,
+    timeout_seconds: int = 120,
+) -> DiscoverResult:
+    """Executa discovery nmap com opcoes de profundidade configuráveis."""
     nmap_bin = shutil.which("nmap")
     if not nmap_bin:
         raise DiscoveryError("Comando 'nmap' não encontrado no ambiente.")
 
+    opts = options or ScanOptions()
     network = _normalize_network(network_input)
-    command = [nmap_bin, "-sn", "-n", str(network), "-oX", "-"]
+    command = _build_command(nmap_bin, network, opts)
 
     try:
         proc = subprocess.run(
@@ -112,4 +197,5 @@ def run_nmap_discovery(network_input: str, timeout_seconds: int = 120) -> Discov
         scanned_at=scanned_at,
         hosts=hosts,
         total_hosts=len(hosts),
+        scan_options=opts,
     )

@@ -14,24 +14,131 @@
 
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body">
-    <form method="post" class="row g-3 align-items-end">
-      <div class="col-md-8 col-lg-6">
-        <label class="form-label" for="network">Faixa de rede (CIDR)</label>
+    <form method="post" class="row g-3">
+
+      <!-- Faixa de rede -->
+      <div class="col-12">
+        <label class="form-label fw-semibold" for="network">
+          <i class="bi bi-diagram-3 me-1 text-success"></i>Faixa de rede (CIDR)
+        </label>
         <input
           id="network"
           name="network"
           type="text"
           class="form-control"
+          style="max-width:320px;"
           placeholder="Ex: 192.168.88.0/24"
           value="{{ network }}"
           required
         />
       </div>
-      <div class="col-md-4 col-lg-3">
-        <button type="submit" class="btn btn-success w-100">
+
+      <!-- Opções de profundidade -->
+      <div class="col-12">
+        <p class="fw-semibold mb-2">
+          <i class="bi bi-sliders me-1"></i>Profundidade da varredura
+        </p>
+
+        <div class="row g-2">
+
+          <!-- Portas -->
+          <div class="col-md-4">
+            <div class="card border h-100">
+              <div class="card-header bg-light small fw-semibold py-2">
+                <i class="bi bi-plug me-1 text-primary"></i>Portas abertas
+              </div>
+              <div class="card-body py-2">
+
+                <div class="form-check mb-2">
+                  <input class="form-check-input scan-port-check" type="checkbox"
+                    id="ports_fast" name="ports_fast" value="1" />
+                  <label class="form-check-label" for="ports_fast">
+                    Top 100 portas <span class="badge bg-success ms-1">rápido</span>
+                    <br><small class="text-muted">SSH, HTTP, HTTPS, RDP, Telnet…</small>
+                  </label>
+                </div>
+
+                <div class="form-check">
+                  <input class="form-check-input scan-port-check" type="checkbox"
+                    id="ports_extended" name="ports_extended" value="1" />
+                  <label class="form-check-label" for="ports_extended">
+                    Top 1000 portas <span class="badge bg-warning text-dark ms-1">mais lento</span>
+                    <br><small class="text-muted">Varredura ampla de serviços TCP</small>
+                  </label>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Serviços -->
+          <div class="col-md-4">
+            <div class="card border h-100">
+              <div class="card-header bg-light small fw-semibold py-2">
+                <i class="bi bi-info-circle me-1 text-info"></i>Serviços e versão
+              </div>
+              <div class="card-body py-2">
+
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox"
+                    id="service_version" name="service_version" value="1" />
+                  <label class="form-check-label" for="service_version">
+                    Versão de serviços <code class="small">-sV</code>
+                    <br><small class="text-muted">
+                      Detecta software e versão em cada porta aberta.
+                      Ativa scan de portas automaticamente.
+                    </small>
+                  </label>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- SO / Fabricante -->
+          <div class="col-md-4">
+            <div class="card border h-100">
+              <div class="card-header bg-light small fw-semibold py-2">
+                <i class="bi bi-cpu me-1 text-secondary"></i>Sistema Operacional / Fabricante
+              </div>
+              <div class="card-body py-2">
+
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox"
+                    id="os_detection" name="os_detection" value="1" />
+                  <label class="form-check-label" for="os_detection">
+                    Detecção de SO <code class="small">-O</code>
+                    <br><small class="text-warning-emphasis text-muted">
+                      <i class="bi bi-exclamation-triangle-fill me-1"></i>Requer root/sudo.
+                      Fingerprinting de TCP/IP para identificar o OS.
+                    </small>
+                  </label>
+                </div>
+
+                <hr class="my-2">
+                <p class="small text-muted mb-0">
+                  <i class="bi bi-ethernet me-1"></i><strong>MAC / Fabricante</strong>
+                  são coletados automaticamente via ARP para hosts na mesma sub-rede,
+                  em qualquer modo de varredura.
+                </p>
+
+              </div>
+            </div>
+          </div>
+
+        </div>{# /row g-2 #}
+      </div>
+
+      <!-- Botão executar -->
+      <div class="col-12">
+        <button type="submit" class="btn btn-success">
           <i class="bi bi-play-circle me-1"></i>Executar Discovery
         </button>
+        <small class="text-muted ms-3">
+          Sem nenhuma opção marcada usa apenas ping (<code>-sn</code>) — modo mais rápido.
+        </small>
       </div>
+
     </form>
   </div>
 </div>
@@ -39,9 +146,23 @@
 {% if discovery %}
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
       <strong>Resultado da varredura</strong>
-      <span class="text-muted ms-2">Rede: {{ discovery.network }}</span>
+      <span class="text-muted">Rede: {{ discovery.network }}</span>
+      <!-- badges das opções usadas -->
+      {% if discovery.scan_options.ports_extended %}
+        <span class="badge bg-warning text-dark">top-1000</span>
+      {% elif discovery.scan_options.ports_fast %}
+        <span class="badge bg-success">top-100</span>
+      {% else %}
+        <span class="badge bg-secondary">ping only</span>
+      {% endif %}
+      {% if discovery.scan_options.service_version %}
+        <span class="badge bg-info text-dark">-sV</span>
+      {% endif %}
+      {% if discovery.scan_options.os_detection %}
+        <span class="badge bg-secondary">-O</span>
+      {% endif %}
     </div>
     <div class="text-muted small">
       {{ discovery.total_hosts }} host(s) ativos • {{ discovery.scanned_at }}
@@ -54,6 +175,13 @@
     <p class="mb-0">Nenhum host ativo encontrado para esta faixa de rede.</p>
   </div>
   {% else %}
+
+  {# controle de colunas opcionais #}
+  {% set show_ports = discovery.scan_options.ports_fast
+                      or discovery.scan_options.ports_extended
+                      or discovery.scan_options.service_version %}
+  {% set show_os    = discovery.scan_options.os_detection %}
+
   <form>
     <div class="card-body p-0">
       <div class="table-responsive">
@@ -64,7 +192,13 @@
               <th>IP</th>
               <th>Hostname</th>
               <th>MAC</th>
-              <th>Vendor</th>
+              <th>Fabricante</th>
+              {% if show_ports %}
+              <th>Portas Abertas</th>
+              {% endif %}
+              {% if show_os %}
+              <th>Sistema Operacional</th>
+              {% endif %}
               <th></th>
             </tr>
           </thead>
@@ -72,7 +206,9 @@
             {% for host in discovery.hosts %}
             <tr>
               <td>
-                <label class="visually-hidden" for="select-host-{{ loop.index }}">Selecionar host {{ host.ip }}</label>
+                <label class="visually-hidden" for="select-host-{{ loop.index }}">
+                  Selecionar host {{ host.ip }}
+                </label>
                 <input
                   id="select-host-{{ loop.index }}"
                   class="form-check-input"
@@ -84,12 +220,31 @@
               </td>
               <td class="fw-semibold">{{ host.ip }}</td>
               <td>{{ host.hostname or '—' }}</td>
-              <td>{{ host.mac or '—' }}</td>
+              <td><code class="small">{{ host.mac or '—' }}</code></td>
               <td>{{ host.vendor or '—' }}</td>
+
+              {% if show_ports %}
+              <td>
+                {% if host.ports %}
+                  <div class="d-flex flex-wrap gap-1">
+                    {% for p in host.ports %}
+                      <span class="badge bg-primary bg-opacity-75 font-monospace">{{ p }}</span>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              {% endif %}
+
+              {% if show_os %}
+              <td class="small">{{ host.os or '—' }}</td>
+              {% endif %}
+
               <td class="text-end">
                 <a
                   href="{{ url_for('devices.onboard_device') }}?vendor={{ (host.vendor or '') | lower }}&host={{ host.ip }}"
-                  class="btn btn-sm btn-outline-primary"
+                  class="btn btn-sm btn-outline-primary text-nowrap"
                 >
                   <i class="bi bi-plus-circle me-1"></i>Cadastrar
                 </a>
@@ -107,4 +262,18 @@
   {% endif %}
 </div>
 {% endif %}
+
+<script>
+  /* Garante que apenas um checkbox de portas fique ativo por vez (top-100 XOR top-1000) */
+  document.querySelectorAll(".scan-port-check").forEach(function (cb) {
+    cb.addEventListener("change", function () {
+      if (this.checked) {
+        document.querySelectorAll(".scan-port-check").forEach(function (other) {
+          if (other !== cb) other.checked = false;
+        });
+      }
+    });
+  });
+</script>
 {% endblock %}
+

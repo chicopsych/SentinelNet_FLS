@@ -38,7 +38,7 @@ from dashboard.repositories.devices_repository import (
 from dashboard.repositories.incidents_repository import (
     list_open_summary_by_device,
 )
-from dashboard.services.discovery import DiscoveryError, run_nmap_discovery
+from dashboard.services.discovery import DiscoveryError, ScanOptions, run_nmap_discovery
 from dashboard.services.reachability import (
     check_device_reachability,
     load_snmp_communities,
@@ -200,8 +200,15 @@ def discover_devices():
                 "Informe uma faixa de rede em CIDR (ex: 192.168.88.0/24)."
             )
         else:
+            form = request.form
+            opts = ScanOptions(
+                ports_fast=bool(form.get("ports_fast")),
+                ports_extended=bool(form.get("ports_extended")),
+                os_detection=bool(form.get("os_detection")),
+                service_version=bool(form.get("service_version")),
+            )
             try:
-                discovery = run_nmap_discovery(network)
+                discovery = run_nmap_discovery(network, options=opts)
             except DiscoveryError as exc:
                 error_message = str(exc)
 

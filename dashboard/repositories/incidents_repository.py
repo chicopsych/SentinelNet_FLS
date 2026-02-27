@@ -302,6 +302,49 @@ def count_validated_today() -> int:
     return rows[0]["cnt"] if rows else 0
 
 
+def list_orphan_incidents(device_ids: set[str]) -> list[dict[str, Any]]:
+    """Lista incidentes cujo device_id nao existe no inventario ativo."""
+    ensure_incidents_table()
+    conn = get_connection()
+    if conn is None:
+        return []
+
+    try:
+        if not device_ids:
+            rows = conn.execute(
+                """SELECT id, timestamp, customer_id, device_id,
+                          severity, category, description, status
+                   FROM incidents
+                   ORDER BY timestamp DESC"""
+            ).fetchall()
+        else:
+            placeholders = ",".join("?" * len(device_ids))
+            rows = conn.execute(
+                f"""SELECT id, timestamp, customer_id, device_id,
+                           severity, category, description, status
+                    FROM incidents
+                    WHERE device_id NOT IN ({placeholders})
+                    ORDER BY timestamp DESC""",
+                tuple(device_ids),
+            ).fetchall()
+
+        return [
+            {
+                "id": row[0],
+                "timestamp": row[1],
+                "customer_id": row[2],
+                "device_id": row[3],
+                "severity": row[4],
+                "category": row[5],
+                "description": row[6],
+                "status": row[7],
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
 def delete_orphan_incidents(device_ids: set[str]) -> int:
     """Remove incidentes sem dispositivo cadastrado no inventario."""
     ensure_incidents_table()

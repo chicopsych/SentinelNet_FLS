@@ -34,9 +34,12 @@
         <div class="card-body">
           <p class="text-muted small mb-1"><i class="bi bi-router me-1"></i>Dispositivos</p>
           <h2 id="kpi-devices-total" class="fw-bold text-dark">{{ overview.devices.total }}</h2>
-          <div class="d-flex gap-3 mt-2 small">
+          <div class="d-flex gap-3 mt-2 small flex-wrap">
             <span class="text-success">
               <i class="bi bi-check-circle-fill me-1"></i><span id="kpi-devices-healthy">{{ overview.devices.healthy }}</span> saudaveis
+            </span>
+            <span class="text-warning">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i><span id="kpi-devices-warning">{{ overview.devices.warning }}</span> warning
             </span>
             <span class="text-danger">
               <i class="bi bi-x-circle-fill me-1"></i><span id="kpi-devices-incident">{{ overview.devices.with_incident }}</span> c/ incidente
