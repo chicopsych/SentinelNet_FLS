@@ -6,6 +6,12 @@ Uso:
     FLASK_ENV=production python run.py # modo produção
 """
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # carrega .env → os.environ antes de qualquer import do projeto
+except ModuleNotFoundError:
+    pass  # em produção o .env não existe; variáveis já estão no ambiente
+
 import os
 
 from dashboard import create_app
