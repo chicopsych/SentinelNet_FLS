@@ -160,3 +160,7 @@ PROJECT_CONTROL.md
 
 # Chat/contexto com IA (arquivo pessoal)
 conversa-com-ia.txt
+
+# Patas
+.github/*
+.Jules/*
