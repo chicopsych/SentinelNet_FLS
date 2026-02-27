@@ -1,3 +1,19 @@
+# 🔍 Lint de Frontend (webhint)
+
+O arquivo de configuração do webhint está em `dashboard/.hintrc`.
+
+Use o comando abaixo para rodar a auditoria com o config correto:
+
+```bash
+npx hint "templates/**/*.html" --config dashboard/.hintrc
+```
+
+Se preferir validar a aplicação em execução local:
+
+```bash
+npx hint http://127.0.0.1:5000 --config dashboard/.hintrc
+```
+
 # 🛰️ SentinelNet_FLS
 
 ## *Enterprise-Grade Configuration Integrity & Network Compliance Orchestrator*
