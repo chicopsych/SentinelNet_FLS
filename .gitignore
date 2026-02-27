@@ -142,7 +142,6 @@ audit_reports/*
 # MacOS
 .AppleDouble
 .LSOverride
-*.DS_Store
 
 # Windows
 desktop.ini
@@ -151,7 +150,6 @@ $RECYCLE.BIN/
 # Python
 pip-log.txt
 pip-delete-this-directory.txt
-.Python
 pip.log
 
 # ────────── GERENCIAMENTO: Arquivos pessoais não versionados ────────────
@@ -159,7 +157,6 @@ pip.log
 PROJECT_CONTROL.md
 instructions.md
 .cursorrules
-instructions.md
 
 # Chat/contexto com IA (arquivo pessoal)
 conversa-com-ia.txt
