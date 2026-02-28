@@ -35,6 +35,8 @@ from utils.vault import (
 
 logger = setup_logger(__name__)
 
+from core.schemas import DeviceConfig  # ajuste o caminho real
+
 
 # ── Ciclo de auditoria por dispositivo ───────────────
 
@@ -84,7 +86,7 @@ def _audit_device(
         raise ValueError(msg)
 
     # c) Coleta snapshot atual via SSH
-    current = cast("DeviceConfig", None)
+    current = cast(DeviceConfig, None)
     with driver:
         current = driver.get_config_snapshot()
 
