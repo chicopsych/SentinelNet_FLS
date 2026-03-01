@@ -38,7 +38,7 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Optional, Type
 
-from core.schemas import DeviceConfig
+from core.schemas import ARPEntry, DeviceConfig, LLDPNeighbor, MACEntry
 from internalloggin.logger import setup_logger
 
 
@@ -196,4 +196,51 @@ class NetworkDeviceDriver(ABC):
         return (
             f"<{self.__class__.__name__} "
             f"host={self.host!r} port={self.port} [{status}]>"
+        )
+
+    # ─── Métodos Opcionais de Topologia ───────────────────────────────────────
+    # Não são obrigatórios (não são @abstractmethod). Drivers que suportam
+    # coleta de topologia fazem override; os demais herdam o fallback.
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def get_arp_table(self) -> list[ARPEntry]:
+        """
+        Coleta a tabela ARP (IP ↔ MAC) do dispositivo.
+
+        Implementado pelos drivers que suportam coleta de topologia L3.
+        O fallback levanta NotImplementedError.
+
+        Returns:
+            Lista de entradas ARP validadas.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} não implementa get_arp_table()."
+        )
+
+    def get_mac_table(self) -> list[MACEntry]:
+        """
+        Coleta a tabela MAC / bridge host (MAC → porta → VLAN).
+
+        Implementado pelos drivers que suportam coleta de topologia L2.
+        O fallback levanta NotImplementedError.
+
+        Returns:
+            Lista de entradas MAC validadas.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} não implementa get_mac_table()."
+        )
+
+    def get_lldp_neighbors(self) -> list[LLDPNeighbor]:
+        """
+        Coleta vizinhos LLDP/CDP/Neighbor Discovery.
+
+        Implementado pelos drivers que suportam descoberta de vizinhos.
+        O fallback levanta NotImplementedError.
+
+        Returns:
+            Lista de vizinhos LLDP validados.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} não implementa get_lldp_neighbors()."
         )

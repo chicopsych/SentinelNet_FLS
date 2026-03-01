@@ -33,7 +33,7 @@ from netmiko.exceptions import (
 from ttp import ttp
 
 from core.base_driver import NetworkDeviceDriver
-from core.schemas import DeviceConfig, FirewallRule, Route
+from core.schemas import ARPEntry, DeviceConfig, FirewallRule, LLDPNeighbor, MACEntry, Route
 from templates import TEMPLATES_DIR
 
 
@@ -458,6 +458,108 @@ class MikroTikDriver(NetworkDeviceDriver):
                     "Descartando rota inválida %s: %s", item, exc
                 )
         return routes
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Métodos de Topologia (L2/L3)
+    # ──────────────────────────────────────────────────────────────────────
+
+    def get_arp_table(self) -> list[ARPEntry]:
+        """
+        Coleta a tabela ARP do MikroTik via ``/ip arp print terse``.
+
+        Returns:
+            Lista de ARPEntry com ip_address, mac_address, interface.
+        """
+        self._assert_connected()
+
+        self._logger.info("Coletando tabela ARP de %s ...", self.host)
+        raw = self._net_connect.send_command(  # type: ignore[union-attr]
+            "/ip arp print terse",
+            read_timeout=30,
+            expect_string=r"\[.+\]",
+        )
+
+        raw_items = self._parse_ttp(raw, "mikrotik_arp.ttp", "arp_entries")
+        entries: list[ARPEntry] = []
+        for item in raw_items:
+            try:
+                entries.append(ARPEntry(**item))
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(
+                    "Descartando entrada ARP inválida %s: %s", item, exc
+                )
+
+        self._logger.info(
+            "Tabela ARP de %s: %d entradas coletadas.", self.host, len(entries)
+        )
+        return entries
+
+    def get_mac_table(self) -> list[MACEntry]:
+        """
+        Coleta a tabela MAC/bridge host via ``/interface bridge host print terse``.
+
+        Returns:
+            Lista de MACEntry com mac_address, interface, is_local.
+        """
+        self._assert_connected()
+
+        self._logger.info("Coletando tabela MAC/bridge de %s ...", self.host)
+        raw = self._net_connect.send_command(  # type: ignore[union-attr]
+            "/interface bridge host print terse",
+            read_timeout=30,
+            expect_string=r"\[.+\]",
+        )
+
+        raw_items = self._parse_ttp(raw, "mikrotik_bridge_host.ttp", "bridge_hosts")
+        entries: list[MACEntry] = []
+        for item in raw_items:
+            try:
+                # MikroTik bridge host: on-interface é a porta física
+                item.setdefault("switch_port", item.get("interface"))
+                entries.append(MACEntry(**item))
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(
+                    "Descartando entrada MAC inválida %s: %s", item, exc
+                )
+
+        self._logger.info(
+            "Tabela MAC de %s: %d entradas coletadas.", self.host, len(entries)
+        )
+        return entries
+
+    def get_lldp_neighbors(self) -> list[LLDPNeighbor]:
+        """
+        Coleta vizinhos via ``/ip neighbor print detail``.
+
+        MikroTik usa seu próprio MNDP mas também reporta vizinhos
+        LLDP e CDP. O output é parseado com TTP.
+
+        Returns:
+            Lista de LLDPNeighbor.
+        """
+        self._assert_connected()
+
+        self._logger.info("Coletando vizinhos LLDP/MNDP de %s ...", self.host)
+        raw = self._net_connect.send_command(  # type: ignore[union-attr]
+            "/ip neighbor print detail",
+            read_timeout=30,
+            expect_string=r"\[.+\]",
+        )
+
+        raw_items = self._parse_ttp(raw, "mikrotik_neighbors.ttp", "neighbors")
+        neighbors: list[LLDPNeighbor] = []
+        for item in raw_items:
+            try:
+                neighbors.append(LLDPNeighbor(**item))
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning(
+                    "Descartando vizinho inválido %s: %s", item, exc
+                )
+
+        self._logger.info(
+            "Vizinhos de %s: %d descobertos.", self.host, len(neighbors)
+        )
+        return neighbors
 
 
 # ─── Helpers de Segurança ─────────────────────────────────────────────────────

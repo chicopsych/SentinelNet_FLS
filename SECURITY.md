@@ -124,7 +124,7 @@ Injete variáveis diretamente:
 Environment="SENTINEL_MASTER_KEY=CHAVE_SEGURA_AQUI"
 Environment="API_STATIC_TOKEN=TOKEN_SEGURO_AQUI"
 Environment="FLASK_ENV=production"
-ExecStart=/opt/sentinelnet/venv/bin/python run.py
+ExecStart=/opt/sentinelnet/venv/bin/python main.py server
 ```
 
 #### Docker / docker-compose

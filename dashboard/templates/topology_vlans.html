@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}VLANs — Topologia — SentinelNet{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h4 mb-0">
+    <i class="bi bi-layers me-2 text-info"></i>Topologia por VLAN
+    <small class="text-muted ms-2">{{ customer }}</small>
+  </h1>
+  <a href="{{ url_for('topology.topology_home', customer=customer) }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+</div>
+
+{% if not vlan_groups %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    {% set message = "Nenhuma VLAN mapeada para este customer." %}
+    {% set icon = "layers" %}
+    {% include "partials/_empty_state.html" %}
+  </div>
+</div>
+
+{% else %}
+<!-- Accordion de VLANs -->
+<div class="accordion" id="vlanAccordion">
+  {% for vlan_id, nodes in vlan_groups.items() %}
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button
+        class="accordion-button {% if not loop.first %}collapsed{% endif %}"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#vlan-{{ vlan_id }}"
+        aria-expanded="{{ 'true' if loop.first else 'false' }}"
+      >
+        <i class="bi bi-layers me-2"></i>
+        VLAN {{ vlan_id }}
+        <span class="badge bg-info text-dark ms-2">{{ nodes | length }} nó(s)</span>
+      </button>
+    </h2>
+    <div
+      id="vlan-{{ vlan_id }}"
+      class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+      data-bs-parent="#vlanAccordion"
+    >
+      <div class="accordion-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>MAC Address</th>
+                <th>IP Address</th>
+                <th>Porta</th>
+                <th>Fabricante</th>
+                <th>Status</th>
+                <th>Última Atividade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for node in nodes %}
+              <tr>
+                <td><code class="text-primary">{{ node.mac_address }}</code></td>
+                <td>{{ node.ip_address or '—' }}</td>
+                <td>{{ node.switch_port or '—' }}</td>
+                <td><small class="text-muted">{{ node.vendor_oui or 'unknown' }}</small></td>
+                <td>
+                  {% if node.authorized %}
+                    <span class="badge bg-success">Autorizado</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark">Não autorizado</span>
+                  {% endif %}
+                </td>
+                <td><small class="text-muted">{{ node.last_seen or '—' }}</small></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

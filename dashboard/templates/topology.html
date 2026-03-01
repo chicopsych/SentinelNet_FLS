@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Topologia — SentinelNet{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h4 mb-0">
+    <i class="bi bi-diagram-3 me-2 text-info"></i>Mapeamento de Topologia
+    <span class="badge bg-secondary ms-2">{{ kpis.total_nodes }} nó(s)</span>
+  </h1>
+
+  <div class="d-flex gap-2">
+    <!-- Disparar scan -->
+    <form method="post" action="{{ url_for('topology.topology_scan') }}" class="d-inline">
+      <input type="hidden" name="customer" value="{{ customer }}" />
+      <button type="submit" class="btn btn-sm btn-success">
+        <i class="bi bi-arrow-repeat me-1"></i>Executar Scan
+      </button>
+    </form>
+    {% if customer %}
+    <a href="{{ url_for('topology.topology_vlans', customer=customer) }}" class="btn btn-sm btn-outline-info">
+      <i class="bi bi-layers me-1"></i>VLANs ({{ kpis.total_vlans }})
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Filtros -->
+  <form method="get" class="d-flex gap-2 flex-wrap">
+    <input
+      type="text" name="customer" value="{{ customer }}"
+      class="form-control form-control-sm"
+      placeholder="Filtrar por cliente"
+      style="max-width: 180px"
+    />
+    <input
+      type="number" name="vlan_id" value="{{ vlan_id or '' }}"
+      class="form-control form-control-sm"
+      placeholder="VLAN ID"
+      style="max-width: 100px"
+    />
+    <button type="submit" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-funnel me-1"></i>Filtrar
+    </button>
+    {% if customer or vlan_id %}
+    <a href="{{ url_for('topology.topology_home') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-x-circle me-1"></i>Limpar
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1"><i class="bi bi-pc-display me-1"></i>Nós Descobertos</p>
+        <h2 class="fw-bold text-dark">{{ kpis.total_nodes }}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1"><i class="bi bi-layers me-1"></i>VLANs Distintas</p>
+        <h2 class="fw-bold text-dark">{{ kpis.total_vlans }}</h2>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not nodes %}
+<!-- Empty state -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    {% set message = "Nenhum nó de topologia encontrado. Execute um scan para descobrir a rede." %}
+    {% set icon = "diagram-3" %}
+    {% include "partials/_empty_state.html" %}
+  </div>
+</div>
+
+{% else %}
+<!-- Tabela de nós -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>MAC Address</th>
+            <th>IP Address</th>
+            <th>VLAN</th>
+            <th>Porta</th>
+            <th>Fabricante</th>
+            <th>Status</th>
+            <th>Última Atividade</th>
+            <th class="text-center">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for node in nodes %}
+          <tr>
+            <td>
+              <code class="text-primary fw-semibold">{{ node.mac_address }}</code>
+            </td>
+            <td>
+              {% if node.ip_address %}
+                {{ node.ip_address }}
+              {% else %}
+                <span class="text-muted fst-italic">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if node.vlan_id %}
+                <span class="badge bg-info text-dark">VLAN {{ node.vlan_id }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>{{ node.switch_port or '—' }}</td>
+            <td>
+              <small class="text-muted">{{ node.vendor_oui or 'unknown' }}</small>
+            </td>
+            <td>
+              {% if node.authorized %}
+                <span class="badge bg-success">Autorizado</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Não autorizado</span>
+              {% endif %}
+            </td>
+            <td>
+              <small class="text-muted">{{ node.last_seen or '—' }}</small>
+            </td>
+            <td class="text-center">
+              <form method="post" action="{{ url_for('topology.topology_authorize') }}" class="d-inline">
+                <input type="hidden" name="customer_id" value="{{ node.customer_id }}" />
+                <input type="hidden" name="mac_address" value="{{ node.mac_address }}" />
+                {% if node.authorized %}
+                  <input type="hidden" name="authorized" value="0" />
+                  <button type="submit" class="btn btn-sm btn-outline-warning" title="Revogar autorização">
+                    <i class="bi bi-shield-x"></i>
+                  </button>
+                {% else %}
+                  <input type="hidden" name="authorized" value="1" />
+                  <button type="submit" class="btn btn-sm btn-outline-success" title="Autorizar nó">
+                    <i class="bi bi-shield-check"></i>
+                  </button>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

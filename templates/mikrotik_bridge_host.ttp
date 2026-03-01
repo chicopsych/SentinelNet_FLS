@@ -1,0 +1,3 @@
+<group name="bridge_hosts">
+{{ mac_address | MAC }} {{ _line_ | re(".*") }} on-interface={{ interface }}{{ _line_ }}
+</group>

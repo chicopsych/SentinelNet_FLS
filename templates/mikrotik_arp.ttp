@@ -1,0 +1,3 @@
+<group name="arp_entries">
+add address={{ ip_address }} interface={{ interface }} mac-address={{ mac_address }}{{ _line_ }}
+</group>

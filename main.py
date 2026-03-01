@@ -1,63 +1,48 @@
 """
 main.py
 ────────
-Ponto de entrada do SentinelNet_FLS — Loop de Auditoria Completo.
+Ponto de entrada unificado do SentinelNet_FLS.
 
-Fluxo:
-    1. Carrega inventário persistido (SQLite) da tabela inventory_devices.
-    2. Para cada dispositivo:
-       a) Obtém credenciais via VaultManager (sem expor segredos nos logs).
-       b) Instancia o driver correto (ex: MikroTikDriver).
-       c) Coleta snapshot de configuração atual.
-       d) Carrega a Baseline JSON de
-          inventory/baselines/<cust>/<dev>.json.
-       e) Compara snapshot × baseline com DiffEngine.
-       f) Persiste desvios no SQLite via IncidentEngine.
-    3. Falha isolada por dispositivo — demais continuam sendo auditados.
+Modos de operação (via CLI):
+    python main.py audit              — executa o loop de auditoria completo
+    python main.py server             — inicia o Dashboard / API Flask
+    python main.py topology           — executa varredura de topologia L2/L3
+    python main.py topology --customer X  — scan filtrado por customer
+
+Variáveis de ambiente relevantes para o servidor:
+    FLASK_ENV   (development | production)
+    FLASK_HOST  (padrão 127.0.0.1)
+    FLASK_PORT  (padrão 5000)
 """
 
 from __future__ import annotations
 
+import argparse
+import os
+import sys
 from typing import Any, cast
 
-from core.repositories.devices_repository import (
-    list_active_inventory_devices,
-)
-from core.services.audit_service import audit_device
-from drivers.mikrotik_driver import MikroTikDriver
 from internalloggin.logger import setup_logger
-from utils.vault import (
-    CredentialNotFoundError,
-    MasterKeyNotFoundError,
-    VaultError,
-    VaultManager,
-)
 
 logger = setup_logger(__name__)
 
-from core.schemas import DeviceConfig  # ajuste o caminho real
 
+# ═══════════════════════════════════════════════════════
+#  AUDIT — loop de auditoria por dispositivo
+# ═══════════════════════════════════════════════════════
 
-# ── Ciclo de auditoria por dispositivo ───────────────
-
-
-def _audit_device(
-    vault: VaultManager, device_info: dict[str, Any]
-) -> None:
+def _audit_device(vault: Any, device_info: dict[str, Any]) -> None:
     """
     Executa o ciclo completo de auditoria para um
     único dispositivo.
-
-    Raises:
-        VaultError: Credenciais ausentes ou cofre.
-        ConnectionError / TimeoutError: SSH.
-        Exception: Qualquer outro erro inesperado.
     """
+    from core.schemas import DeviceConfig
+    from core.services.audit_service import audit_device
+    from drivers.mikrotik_driver import MikroTikDriver
+
     customer_id: str = device_info["customer_id"]
     device_id: str = device_info["device_id"]
-    vendor: str = device_info.get(
-        "vendor", ""
-    ).lower()
+    vendor: str = device_info.get("vendor", "").lower()
 
     logger.info(
         "── Auditando %s / %s ──",
@@ -66,9 +51,7 @@ def _audit_device(
     )
 
     # a) Credenciais via VaultManager
-    creds = vault.get_credentials(
-        customer_id, device_id
-    )
+    creds = vault.get_credentials(customer_id, device_id)
 
     # b) Instancia o driver correto
     if vendor == "mikrotik":
@@ -107,18 +90,12 @@ def _audit_device(
 
     if result.has_drift and result.incident_id:
         logger.error(
-            "Incidente #%d registrado [%s] para "
-            "%s/%s.",
+            "Incidente #%d registrado [%s] para %s/%s.",
             result.incident_id,
-            result.severity.name
-            if result.severity
-            else "?",
+            result.severity.name if result.severity else "?",
             customer_id,
             device_id,
         )
-
-
-# ── Loop principal ────────────────────────────────────────────────────────
 
 
 def run_audit_loop() -> None:
@@ -127,6 +104,16 @@ def run_audit_loop() -> None:
     Cada dispositivo é auditado de forma isolada — a falha em um
     não interrompe os demais.
     """
+    from core.repositories.devices_repository import (
+        list_active_inventory_devices,
+    )
+    from utils.vault import (
+        CredentialNotFoundError,
+        MasterKeyNotFoundError,
+        VaultError,
+        VaultManager,
+    )
+
     logger.info("SentinelNet_FLS — Loop de Auditoria iniciado.")
     inventory_devices = list_active_inventory_devices()
     logger.info(
@@ -146,7 +133,8 @@ def run_audit_loop() -> None:
     except MasterKeyNotFoundError as exc:
         logger.critical(
             "SENTINEL_MASTER_KEY não configurada. "
-            "Execute: export SENTINEL_MASTER_KEY=<chave>. Detalhe: %s", exc,
+            "Execute: export SENTINEL_MASTER_KEY=<chave>. Detalhe: %s",
+            exc,
         )
         return
     except VaultError as exc:
@@ -189,12 +177,113 @@ def run_audit_loop() -> None:
 
     logger.info(
         "Auditoria concluída — sucesso: %d  falha: %d.",
-        success_count, failure_count,
+        success_count,
+        failure_count,
+    )
+
+
+# ═══════════════════════════════════════════════════════
+#  SERVER — Dashboard / API Flask
+# ═══════════════════════════════════════════════════════
+
+def run_server() -> None:
+    """Inicia o servidor Flask (Dashboard + API REST)."""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ModuleNotFoundError:
+        pass  # em produção o .env não existe; variáveis já estão no ambiente
+
+    from api import create_app
+    from api.config import DevelopmentConfig, ProductionConfig
+
+    _ENV_MAP = {
+        "production": ProductionConfig,
+        "prod":       ProductionConfig,
+    }
+
+    env = os.getenv("FLASK_ENV", "development").lower()
+    config_class = _ENV_MAP.get(env, DevelopmentConfig)
+
+    app = create_app(config_class=config_class)
+
+    debug_mode = bool(app.config.get("DEBUG", False))
+    if env in _ENV_MAP:
+        debug_mode = False
+
+    host = os.getenv("FLASK_HOST", "127.0.0.1")
+    port = int(os.getenv("FLASK_PORT", 5000))
+
+    logger.info(
+        "Iniciando servidor Flask em %s:%d (env=%s, debug=%s)",
+        host, port, env, debug_mode,
+    )
+
+    app.run(host=host, port=port, debug=debug_mode)
+
+
+# ═══════════════════════════════════════════════════════
+#  CLI — argparse
+# ═══════════════════════════════════════════════════════
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="sentinelnet",
+        description="SentinelNet_FLS — Auditoria de rede e Dashboard.",
+    )
+    sub = parser.add_subparsers(dest="command")
+
+    sub.add_parser(
+        "audit",
+        help="Executa o loop de auditoria completo.",
+    )
+    sub.add_parser(
+        "server",
+        help="Inicia o Dashboard / API Flask.",
+    )
+
+    topo_parser = sub.add_parser(
+        "topology",
+        help="Executa varredura de topologia L2/L3.",
+    )
+    topo_parser.add_argument(
+        "--customer",
+        default=None,
+        help="Filtra scan por customer_id (opcional).",
+    )
+
+    return parser
+
+
+def run_topology_cli(customer: str | None = None) -> None:
+    """Executa scan de topologia via CLI."""
+    from core.db import ensure_topology_tables
+    from core.services.topology_service import run_topology_scan
+
+    ensure_topology_tables()
+    logger.info("SentinelNet_FLS — Topology Scan (CLI)")
+    summary = run_topology_scan(customer_filter=customer)
+    logger.info(
+        "Resumo: %d dispositivo(s), %d nó(s), %d drift(s).",
+        summary["devices_scanned"],
+        summary["nodes_discovered"],
+        summary["drifts"],
     )
 
 
 def main() -> None:
-    run_audit_loop()
+    parser = _build_parser()
+    args = parser.parse_args()
+
+    if args.command == "audit":
+        run_audit_loop()
+    elif args.command == "server":
+        run_server()
+    elif args.command == "topology":
+        run_topology_cli(customer=args.customer)
+    else:
+        parser.print_help()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

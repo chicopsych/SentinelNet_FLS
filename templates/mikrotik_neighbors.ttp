@@ -1,0 +1,8 @@
+<group name="neighbors">
+{{ _start_ }}
+ interface={{ local_port }} address={{ remote_ip }} mac-address={{ remote_mac }}{{ _line_ }}
+ identity="{{ remote_device }}"{{ _line_ }}
+ platform="{{ remote_platform }}"{{ _line_ }}
+ interface-name="{{ remote_port }}"{{ _line_ }}
+{{ _end_ }}
+</group>

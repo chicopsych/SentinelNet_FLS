@@ -76,32 +76,26 @@ SENTINEL_MASTER_KEY=CHAVE_GERADA_NO_AMBIENTE_LOCAL
 
 ---
 
-### Passo 3 — Instalar `python-dotenv` e carregar o `.env` no `run.py`
+### Passo 3 — Instalar `python-dotenv` e carregar o `.env` no `main.py`
 
 ```bash
 pip install python-dotenv
 pip freeze | grep python-dotenv >> requirements.txt
 ```
 
-Edite `run.py` adicionando o carregamento do `.env` **antes** de qualquer
-import do projeto:
+O `main.py` já carrega o `.env` automaticamente ao iniciar o servidor.
+O trecho relevante:
 
 ```python
-# run.py  ← adicionar no topo, antes de "from dashboard import ..."
+# main.py → run_server() já faz isso internamente
 from dotenv import load_dotenv
 load_dotenv()          # lê .env e injeta as variáveis no os.environ
 ```
 
-Depois disso o `run.py` ficará assim:
+O servidor é iniciado com:
 
-```python
-from dotenv import load_dotenv
-load_dotenv()
-
-import os
-from dashboard import create_app
-from dashboard.config import DevelopmentConfig, ProductionConfig
-...
+```bash
+python main.py server
 ```
 
 > `load_dotenv()` sem argumento procura o arquivo `.env` automaticamente
@@ -169,7 +163,7 @@ Saída esperada:
 ### Passo 7 — Iniciar o dashboard
 
 ```bash
-python run.py
+python main.py server
 ```
 
 O erro `SENTINEL_MASTER_KEY não está configurada` deixará de aparecer.
@@ -201,7 +195,7 @@ python -m utils.vault_setup add --customer CLIENTE --device DEVICE
 python -m utils.vault_setup list
 
 # 8. Iniciar dashboard
-python run.py
+python main.py server
 ```
 
 ---
@@ -217,7 +211,7 @@ Nunca faça deploy do arquivo `.env`.
 # /etc/systemd/system/sentinelnet.service
 [Service]
 Environment="SENTINEL_MASTER_KEY=sua_chave_aqui"
-ExecStart=/opt/sentinelnet/venv/bin/python run.py
+ExecStart=/opt/sentinelnet/venv/bin/python main.py server
 WorkingDirectory=/opt/sentinelnet
 ```
 
@@ -252,7 +246,7 @@ services:
 
 ```bash
 export SENTINEL_MASTER_KEY="sua_chave_aqui"
-python run.py
+python main.py server
 ```
 
 > Para tornar permanente adicione o `export` ao `~/.zshrc` ou `~/.bashrc`

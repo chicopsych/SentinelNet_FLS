@@ -492,3 +492,195 @@ class DeviceConfig(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc),
         description="Timestamp UTC de quando a configuração foi coletada ou definida.",
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Modelos de Topologia (Mapeamento L2 / L3)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class ARPEntry(BaseModel):
+    """
+    Entrada da tabela ARP — correlação L3 (IP ↔ MAC) obtida de um roteador
+    ou switch de camada 3.
+
+    Fonte de dados:
+        - MikroTik: ``/ip arp print``
+        - SNMP: ipNetToMediaTable (OID 1.3.6.1.2.1.4.22)
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    ip_address: str = Field(
+        ..., description="Endereço IPv4 do ativo na rede."
+    )
+    mac_address: str = Field(
+        ..., description="MAC address associado ao IP (formato XX:XX:XX:XX:XX:XX)."
+    )
+    interface: Optional[str] = Field(
+        default=None,
+        description="Interface do roteador/switch onde a entrada ARP foi aprendida.",
+    )
+    vlan_id: Optional[int] = Field(
+        default=None, ge=1, le=4094,
+        description="VLAN ID da interface (se disponível).",
+    )
+    last_seen: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp da última vez que a entrada foi observada.",
+    )
+
+    _normalize_mac = field_validator("mac_address", mode="before")(
+        Interface._normalize_mac_address.__func__  # type: ignore[attr-defined]
+    )
+
+
+class MACEntry(BaseModel):
+    """
+    Entrada da tabela MAC (bridge/forwarding) — mapeamento L2 de MAC para
+    porta física e VLAN.
+
+    Fonte de dados:
+        - MikroTik: ``/interface bridge host print``
+        - SNMP: dot1dTpFdbTable / dot1qTpFdbTable
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    mac_address: str = Field(
+        ..., description="Endereço MAC do ativo."
+    )
+    interface: Optional[str] = Field(
+        default=None,
+        description="Porta/interface do switch onde o MAC foi aprendido.",
+    )
+    vlan_id: Optional[int] = Field(
+        default=None, ge=1, le=4094,
+        description="VLAN associada ao MAC nesta porta.",
+    )
+    switch_port: Optional[str] = Field(
+        default=None,
+        description="Identificador físico da porta do switch (ex: 'ether12', 'Gi0/1').",
+    )
+    vendor_oui: Optional[str] = Field(
+        default=None,
+        description="Fabricante inferido pelos 3 primeiros octetos do MAC (OUI).",
+    )
+    is_local: bool = Field(
+        default=False,
+        description="True se o MAC pertence ao próprio dispositivo (não aprendido).",
+    )
+    last_seen: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp da última observação.",
+    )
+
+    _normalize_mac = field_validator("mac_address", mode="before")(
+        Interface._normalize_mac_address.__func__  # type: ignore[attr-defined]
+    )
+
+
+class LLDPNeighbor(BaseModel):
+    """
+    Vizinho descoberto via LLDP, CDP ou protocolo de neighbor discovery.
+
+    Fonte de dados:
+        - MikroTik: ``/ip neighbor print detail``
+        - SNMP: lldpRemTable (OID 1.0.8802.1.1.2.1.4)
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    local_port: Optional[str] = Field(
+        default=None,
+        description="Porta local onde o vizinho foi descoberto.",
+    )
+    remote_device: Optional[str] = Field(
+        default=None,
+        description="Hostname/identity do vizinho remoto.",
+    )
+    remote_port: Optional[str] = Field(
+        default=None,
+        description="Porta do vizinho remoto conectada ao local.",
+    )
+    remote_ip: Optional[str] = Field(
+        default=None,
+        description="Endereço IP de gerência do vizinho.",
+    )
+    remote_mac: Optional[str] = Field(
+        default=None,
+        description="MAC address do vizinho.",
+    )
+    remote_platform: Optional[str] = Field(
+        default=None,
+        description="Fabricante/modelo/SO do vizinho (ex: 'MikroTik RB4011').",
+    )
+    remote_description: Optional[str] = Field(
+        default=None,
+        description="Texto descritivo do sistema remoto.",
+    )
+
+    _normalize_mac = field_validator("remote_mac", mode="before")(
+        Interface._normalize_mac_address.__func__  # type: ignore[attr-defined]
+    )
+
+
+class TopologySnapshot(BaseModel):
+    """
+    Snapshot completo de topologia coletado de um dispositivo.
+    Agrega tabelas ARP, MAC e vizinhos LLDP.
+    """
+
+    customer_id: str
+    device_id: str
+    collected_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+    )
+    arp_table: list[ARPEntry] = Field(default_factory=list)
+    mac_table: list[MACEntry] = Field(default_factory=list)
+    lldp_neighbors: list[LLDPNeighbor] = Field(default_factory=list)
+
+
+class NetworkNode(BaseModel):
+    """
+    Nó de rede correlacionado — visão unificada L2/L3 de um ativo.
+
+    Resultado da fusão da tabela ARP (IP → MAC) com a tabela MAC
+    (MAC → porta → VLAN). Representa um dispositivo na topologia.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    mac_address: str = Field(
+        ..., description="Identificador primário de auditoria (mais estável que IP)."
+    )
+    ip_address: Optional[str] = Field(
+        default=None, description="Endereço IPv4 (via ARP)."
+    )
+    hostname: Optional[str] = Field(
+        default=None, description="Nome do host (se resolvido)."
+    )
+    vlan_id: Optional[int] = Field(
+        default=None, ge=1, le=4094,
+        description="VLAN onde o nó foi observado.",
+    )
+    switch_port: Optional[str] = Field(
+        default=None, description="Porta física do switch (ex: 'ether12').",
+    )
+    vendor_oui: Optional[str] = Field(
+        default=None, description="Fabricante inferido pelo OUI do MAC."
+    )
+    first_seen: Optional[datetime] = Field(
+        default=None, description="Primeira vez que o nó foi observado."
+    )
+    last_seen: Optional[datetime] = Field(
+        default=None, description="Última vez que o nó foi observado."
+    )
+    authorized: bool = Field(
+        default=False,
+        description="Se True, o nó está autorizado para as VLANs onde reside.",
+    )
+
+    _normalize_mac = field_validator("mac_address", mode="before")(
+        Interface._normalize_mac_address.__func__  # type: ignore[attr-defined]
+    )

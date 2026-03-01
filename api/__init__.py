@@ -15,6 +15,7 @@ from api.blueprints.devices import devices_bp
 from api.blueprints.health import health_bp
 from api.blueprints.incidents import incidents_bp
 from api.blueprints.remediation import remediation_bp
+from api.blueprints.topology import topology_bp
 from api.config import DevelopmentConfig
 
 
@@ -47,6 +48,9 @@ def create_app(config_class=DevelopmentConfig) -> Flask:
     )
     app.register_blueprint(
         admin_bp, url_prefix="/admin"
+    )
+    app.register_blueprint(
+        topology_bp, url_prefix="/topology"
     )
 
     # ── Rota raiz ─────────────────────────────────────
